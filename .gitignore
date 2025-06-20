@@ -1,6 +1,7 @@
 *.cast
 *.rpcast/
-*.tar.gz
 2048_debug
 2048_debug.dSYM/
 TAGS
+# But allow our backup
+!2048-cli-src-backup.tar.gz
