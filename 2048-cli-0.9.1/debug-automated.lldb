@@ -1,0 +1,45 @@
+# LLDB Automated Game Play Script for 2048
+# This script runs the game automatically and dumps board states
+# Usage: lldb ./2048 -- --ai -s 5 < /dev/null 2>&1 | tee debug-output.txt
+
+# Breakpoint at game initialization to dump initial state
+breakpoint set --name gamestate_init --one-shot true
+breakpoint command add
+expression -- printf("=== INITIAL BOARD STATE ===\n")
+thread step-out
+expression -- printf("Grid: %dx%d\n", g->opts->grid_width, g->opts->grid_height)
+expression -- printf("Initial blocks: %d\n", g->blocks_in_play)
+memory read -c 16 -f d g->grid_data_ptr
+continue
+DONE
+
+# Breakpoint every N moves to show progression
+breakpoint set --name engine_tick
+breakpoint modify -i 10
+breakpoint command add
+expression -- printf("\n=== GAME STATE AT TICK ===\n")
+expression -- printf("Score: %ld\n", g->score)
+expression -- printf("Blocks: %d\n", g->blocks_in_play)
+expression -- int i, j
+expression -- for (i = 0; i < g->opts->grid_height; i++) { \
+    for (j = 0; j < g->opts->grid_width; j++) { \
+        printf("%5d ", g->grid[i][j]); \
+    } \
+    printf("\n"); \
+}
+continue
+DONE
+
+# Breakpoint at game end
+breakpoint set --name gamestate_game_end
+breakpoint command add
+expression -- printf("\n=== GAME OVER ===\n")
+expression -- printf("Final Score: %ld\n", g->score)
+expression -- printf("High Score: %ld\n", g->score_high)
+expression -- printf("Final board:\n")
+memory read -c 16 -f d g->grid_data_ptr
+quit
+DONE
+
+# Run with AI mode
+run --ai --size 5

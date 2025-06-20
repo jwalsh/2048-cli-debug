@@ -1,0 +1,68 @@
+# LLDB Debug Script for 2048
+# Usage: lldb ./2048 -s debug.lldb
+
+# Set up common breakpoints
+breakpoint set --name main
+breakpoint set --name gamestate_init
+breakpoint set --name gamestate_new_block
+breakpoint set --name engine_move
+breakpoint set --name gfx_draw
+
+# Create command aliases for convenience
+command alias dump_board expression -o -- (void)dump_gamestate(g)
+command alias show_score expression g->score
+command alias show_grid expression -o -- (void)print_grid(g)
+
+# Set breakpoint commands to auto-dump board state
+breakpoint command add 2
+expression -- printf("=== Board State After Init ===\n")
+expression -- printf("Grid size: %dx%d\n", g->opts->grid_width, g->opts->grid_height)
+expression -- printf("Score: %ld\n", g->score)
+expression -- printf("Blocks in play: %d\n", g->blocks_in_play)
+expression -o -- (void)print_grid(g)
+continue
+DONE
+
+breakpoint command add 3
+expression -- printf("=== New Block Added ===\n")
+expression -o -- (void)print_grid(g)
+continue
+DONE
+
+# Run the program
+run
+
+# Define helper functions in the debugger
+expression -- void print_grid(struct gamestate *gs) { \
+    int i, j; \
+    printf("\n"); \
+    for (i = 0; i < gs->opts->grid_height; i++) { \
+        printf("[ "); \
+        for (j = 0; j < gs->opts->grid_width; j++) { \
+            printf("%5d ", gs->grid[i][j]); \
+        } \
+        printf("]\n"); \
+    } \
+    printf("\n"); \
+}
+
+expression -- void dump_gamestate(struct gamestate *gs) { \
+    printf("=== GAMESTATE DUMP ===\n"); \
+    printf("Grid dimensions: %dx%d\n", gs->opts->grid_width, gs->opts->grid_height); \
+    printf("Total cells: %d\n", gs->gridsize); \
+    printf("Score: %ld\n", gs->score); \
+    printf("High Score: %ld\n", gs->score_high); \
+    printf("Last Score: %ld\n", gs->score_last); \
+    printf("Blocks in play: %d\n", gs->blocks_in_play); \
+    printf("Moved flag: %d\n", gs->moved); \
+    printf("Grid data ptr: %p\n", gs->grid_data_ptr); \
+    printf("Grid ptr: %p\n", gs->grid); \
+    print_grid(gs); \
+}
+
+# Memory examination commands
+# After hitting a breakpoint, use these:
+# (lldb) dump_board
+# (lldb) show_score
+# (lldb) show_grid
+# (lldb) memory read -c 16 -f d g->grid_data_ptr

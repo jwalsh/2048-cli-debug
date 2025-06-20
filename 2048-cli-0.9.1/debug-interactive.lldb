@@ -1,0 +1,64 @@
+# LLDB Interactive Debug Script for 2048
+# This script sets up an interactive debugging session
+# Usage: lldb ./2048 -s debug-interactive.lldb
+
+# Set breakpoints at key game loop points
+breakpoint set --name engine_tick --condition 'g->blocks_in_play > 5'
+breakpoint set --name gamestate_game_end
+breakpoint set --name engine_move
+
+# Memory watchpoints (uncomment after g is initialized)
+# watchpoint set variable g->score
+# watchpoint set expression -s 4 -- g->grid[0][0]
+
+# Pretty print settings
+settings set target.max-string-summary-length 256
+settings set target.max-memory-read-size 1024
+
+# Auto-display board on each stop
+target stop-hook add --one-liner "expression -o -- (void)print_grid(g)"
+
+# Define inspection functions
+expression -- void inspect_move(struct gamestate *gs, int direction) { \
+    printf("=== MOVE INSPECTION ===\n"); \
+    printf("Direction: %s\n", \
+        direction == 0 ? "UP" : \
+        direction == 1 ? "DOWN" : \
+        direction == 2 ? "LEFT" : "RIGHT"); \
+    printf("Board before move:\n"); \
+    print_grid(gs); \
+}
+
+expression -- void dump_raw_memory(struct gamestate *gs) { \
+    int i; \
+    printf("=== RAW MEMORY DUMP ===\n"); \
+    printf("Address: %p\n", gs->grid_data_ptr); \
+    for (i = 0; i < gs->gridsize; i++) { \
+        if (i % gs->opts->grid_width == 0) printf("\n"); \
+        printf("%04x ", gs->grid_data_ptr[i]); \
+    } \
+    printf("\n\n"); \
+}
+
+# Create convenience commands
+command alias board expression -o -- (void)print_grid(g)
+command alias raw expression -o -- (void)dump_raw_memory(g)
+command alias state expression -o -- (void)dump_gamestate(g)
+
+# Set up conditional breakpoint for win condition
+breakpoint set --name engine_move --condition '*(int*)memchr(g->grid_data_ptr, 2048, g->gridsize * sizeof(int)) == 2048'
+breakpoint modify -c "printf(\"WIN CONDITION REACHED!\\n\")" -G true
+
+# Instructions
+expression -- printf("\n=== 2048 LLDB Debug Session ===\n")
+expression -- printf("Commands available:\n")
+expression -- printf("  board  - Display current board\n")
+expression -- printf("  raw    - Dump raw memory\n")
+expression -- printf("  state  - Full gamestate dump\n")
+expression -- printf("  c      - Continue execution\n")
+expression -- printf("  n      - Next line\n")
+expression -- printf("  s      - Step into\n")
+expression -- printf("===============================\n\n")
+
+# Start execution
+run

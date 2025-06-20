@@ -1,0 +1,18 @@
+# LLDB commands for debugging 2048
+
+# Set breakpoints
+b main
+b engine_tick
+b gfx_draw
+
+# Run with arguments
+# run --size 4
+
+# Useful commands:
+# bt - backtrace
+# frame variable - show local variables
+# p <variable> - print variable
+# c - continue
+# n - next line
+# s - step into
+# finish - step out

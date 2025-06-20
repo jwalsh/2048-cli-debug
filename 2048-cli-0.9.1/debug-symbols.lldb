@@ -1,0 +1,24 @@
+# LLDB Symbol Dump Script for 2048
+# Usage: lldb ./2048 -s debug-symbols.lldb -o quit
+
+# Dump all symbols
+image list
+image dump sections
+image dump symtab
+
+# Show specific symbol information
+image lookup -n main
+image lookup -n gamestate_init
+image lookup -n engine_move
+image lookup -n engine_tick
+image lookup -n gfx_draw
+
+# Show type information
+image lookup -t gamestate
+image lookup -t gameoptions
+
+# Dump memory map
+image show-unwind -n main
+
+# Exit
+quit

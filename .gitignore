@@ -1,0 +1,6 @@
+*.cast
+*.rpcast/
+*.tar.gz
+2048_debug
+2048_debug.dSYM/
+TAGS
