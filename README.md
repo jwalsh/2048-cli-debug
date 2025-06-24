@@ -9,8 +9,9 @@
 
 A comprehensive debugging and analysis environment for the [2048-cli](https://github.com/Tiehuis/2048-cli) game, featuring LLDB integration, memory analysis tools, and Emacs development support.
 
-## 🎮 Game Screenshot
+## 🎮 Game Screenshots
 
+### Starting Position
 ```
 Score: 28 (+12)
    Hi: 932
@@ -21,6 +22,19 @@ Score: 28 (+12)
 |      |      |      |      |
 -----------------------------
 ```
+
+### High Score Achievement (Academically Validated Down-Right Strategy™)
+```
+Score: 1708 (+4) 🎉
+   Hi: 932
+-----------------------------
+|    2 |      |    4 |   32 |
+|      |    8 |  128 |    4 |
+|    2 |   16 |    8 |   16 |
+|   16 |    2 |  128 |    2 |
+-----------------------------
+```
+*Achieved using the sophisticated "spam down and right" heuristic from academic research*
 
 ## 🚀 Features
 
