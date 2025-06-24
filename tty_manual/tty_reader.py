@@ -12,7 +12,7 @@ import sys
 import time
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import click
 
 class TTYReader:
@@ -139,7 +139,7 @@ class TTYReader:
             'board': self.current_board,
             'score': self.current_score,
             'high_score': self.high_score,
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
     
     def save_board_snapshot(self, filepath):

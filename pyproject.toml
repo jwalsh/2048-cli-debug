@@ -11,4 +11,5 @@ dependencies = [
 
 [project.scripts]
 tty-reader = "tty_manual.tty_reader:main"
-manual-test = "tty_manual.run_manual_test:main"
+board-analyzer = "tty_manual.board_analyzer:main"
+manual-test = "tty_manual.manual_test_runner:main"

@@ -1,0 +1,8 @@
+{
+  "test_guid": "a7f38efc-72ba-4c39-90cb-e5bc9647a453",
+  "start_time": "2025-06-24T23:48:49.867375Z",
+  "spam_moves": 30,
+  "check_interval": 5,
+  "complexity_threshold": 60,
+  "strategy": "down_right_spam"
+}
