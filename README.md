@@ -1,5 +1,6 @@
 # 2048 CLI Debug
 
+[![Status: DRAFT](https://img.shields.io/badge/Status-DRAFT-orange?style=for-the-badge)](https://github.com/jwalsh/2048-cli-debug)
 [![C](https://img.shields.io/badge/C-00599C?style=for-the-badge&logo=c&logoColor=white)](https://en.wikipedia.org/wiki/C_(programming_language))
 [![LLDB](https://img.shields.io/badge/LLDB-3F4145?style=for-the-badge&logo=llvm&logoColor=white)](https://lldb.llvm.org/)
 [![Emacs](https://img.shields.io/badge/Emacs-7F5AB6?style=for-the-badge&logo=gnu-emacs&logoColor=white)](https://www.gnu.org/software/emacs/)
