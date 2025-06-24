@@ -1,0 +1,100 @@
+#!/usr/bin/expect -f
+# Smart 2048 player with screenshot capture
+
+set timeout -1
+set screenshot_dir "screenshots/game_[clock format [clock seconds] -format %Y%m%d_%H%M%S]"
+exec mkdir -p $screenshot_dir
+
+# Build the game
+puts "Building 2048..."
+exec make -C 2048-cli-0.9.1 clean
+exec make -C 2048-cli-0.9.1 2048
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+
+# Move counter
+set move_count 0
+set high_score_target 932
+
+# Function to take screenshot
+proc take_screenshot {move_num dir} {
+    set filename [format "%s/move_%04d.png" $dir $move_num]
+    exec screencapture -x -R "0,0,800,600" $filename
+    puts "Screenshot saved: $filename"
+}
+
+# Take initial screenshot
+take_screenshot 0 $screenshot_dir
+
+# Smart movement strategy
+proc get_next_move {attempt} {
+    # Strategy: Keep high tiles in corners
+    # Priority: down > right > left > up
+    # With some randomization to avoid getting stuck
+    
+    set r [expr {rand()}]
+    
+    if {$attempt == 0} {
+        # First attempt - use smart strategy
+        if {$r < 0.4} {
+            return "s"  ;# down
+        } elseif {$r < 0.7} {
+            return "d"  ;# right
+        } elseif {$r < 0.9} {
+            return "a"  ;# left
+        } else {
+            return "w"  ;# up
+        }
+    } else {
+        # Subsequent attempts - try different moves
+        set moves [list "s" "d" "a" "w"]
+        return [lindex $moves [expr {$attempt % 4}]]
+    }
+}
+
+# Game loop
+while {$move_count < 1000} {
+    incr move_count
+    
+    # Get next move
+    set move [get_next_move 0]
+    
+    # Send move
+    send "$move"
+    
+    # Wait for board update
+    expect {
+        "Game over" {
+            puts "Game Over! Total moves: $move_count"
+            take_screenshot $move_count $screenshot_dir
+            break
+        }
+        "Score:" {
+            # Extract score if possible
+            expect -re {Score: ([0-9]+)}
+            if {[info exists expect_out(1,string)]} {
+                set current_score $expect_out(1,string)
+                puts "Move $move_count - Score: $current_score"
+                
+                if {$current_score > $high_score_target} {
+                    puts "NEW HIGH SCORE: $current_score!"
+                }
+            }
+            
+            # Take screenshot
+            after 200
+            take_screenshot $move_count $screenshot_dir
+        }
+        timeout {
+            # Try next move
+            continue
+        }
+    }
+    
+    # Small delay between moves
+    after 100
+}
+
+puts "Game ended. Screenshots saved to: $screenshot_dir"
+exit
