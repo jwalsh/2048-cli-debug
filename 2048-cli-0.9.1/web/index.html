@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Debug (WebAssembly)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #faf8ef;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        #game-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        #score-container {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        
+        .score-box {
+            display: inline-block;
+            background: #bbada0;
+            color: white;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 3px;
+        }
+        
+        #game-board {
+            background: #bbada0;
+            border-radius: 6px;
+            width: 500px;
+            height: 500px;
+            position: relative;
+            margin: 0 auto;
+        }
+        
+        .tile {
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            background: #cdc1b4;
+            border-radius: 3px;
+            font-size: 55px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.15s ease-in-out;
+        }
+        
+        .tile-2 { background: #eee4da; color: #776e65; }
+        .tile-4 { background: #ede0c8; color: #776e65; }
+        .tile-8 { background: #f2b179; color: #f9f6f2; }
+        .tile-16 { background: #f59563; color: #f9f6f2; }
+        .tile-32 { background: #f67c5f; color: #f9f6f2; }
+        .tile-64 { background: #f65e3b; color: #f9f6f2; }
+        .tile-128 { background: #edcf72; color: #f9f6f2; font-size: 45px; }
+        .tile-256 { background: #edcc61; color: #f9f6f2; font-size: 45px; }
+        .tile-512 { background: #edc850; color: #f9f6f2; font-size: 45px; }
+        .tile-1024 { background: #edc53f; color: #f9f6f2; font-size: 35px; }
+        .tile-2048 { background: #edc22e; color: #f9f6f2; font-size: 35px; }
+        
+        #debug-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 6px;
+        }
+        
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #8f7a66;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        }
+        
+        button:hover {
+            background: #9f8a76;
+        }
+        
+        #memory-dump {
+            margin-top: 20px;
+            font-family: monospace;
+            text-align: left;
+            background: white;
+            padding: 10px;
+            border-radius: 3px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            color: #776e65;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>2048 Debug</h1>
+        
+        <div id="score-container">
+            <span class="score-box">Score: <span id="score">0</span></span>
+            <span class="score-box">High: <span id="highscore">0</span></span>
+        </div>
+        
+        <div id="game-board"></div>
+        
+        <div class="instructions">
+            Use arrow keys or WASD to play
+        </div>
+        
+        <div id="debug-panel">
+            <h3>Debug Tools</h3>
+            <button onclick="dumpMemory()">Dump Memory</button>
+            <button onclick="showGameState()">Show State</button>
+            <button onclick="stepAI()">AI Step</button>
+            <button onclick="resetGame()">Reset</button>
+            
+            <div id="memory-dump"></div>
+        </div>
+    </div>
+    
+    <script>
+        let gameModule = null;
+        let gameInstance = null;
+        window.lastKeyPressed = null;
+        
+        // Key mapping
+        const keyMap = {
+            'ArrowUp': 'w', 'w': 'w', 'W': 'w',
+            'ArrowDown': 's', 's': 's', 'S': 's',
+            'ArrowLeft': 'a', 'a': 'a', 'A': 'a',
+            'ArrowRight': 'd', 'd': 'd', 'D': 'd',
+            'q': 'q', 'Q': 'q'
+        };
+        
+        // Board update function
+        window.updateGameBoard = function(board) {
+            const boardEl = document.getElementById('game-board');
+            boardEl.innerHTML = '';
+            
+            const size = board.length;
+            const tileSize = 110;
+            const spacing = 15;
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const value = board[i][j];
+                    if (value > 0) {
+                        const tile = document.createElement('div');
+                        tile.className = `tile tile-${value}`;
+                        tile.textContent = value;
+                        tile.style.left = `${j * (tileSize + spacing) + spacing}px`;
+                        tile.style.top = `${i * (tileSize + spacing) + spacing}px`;
+                        boardEl.appendChild(tile);
+                    }
+                }
+            }
+        };
+        
+        // Score update function
+        window.updateScore = function(score, highscore) {
+            document.getElementById('score').textContent = score;
+            document.getElementById('highscore').textContent = highscore;
+        };
+        
+        // Game over handler
+        window.onGameOver = function() {
+            alert('Game Over!');
+        };
+        
+        // Debug functions
+        function dumpMemory() {
+            if (!gameInstance) return;
+            
+            const ptr = gameModule._game_get_board_ptr(gameInstance);
+            const size = gameModule._game_get_board_size(gameInstance);
+            const memory = new Int32Array(gameModule.HEAP32.buffer, ptr, size);
+            
+            const dumpEl = document.getElementById('memory-dump');
+            dumpEl.innerHTML = '<strong>Board Memory:</strong><br>';
+            
+            const sqrt = Math.sqrt(size);
+            for (let i = 0; i < size; i++) {
+                if (i % sqrt === 0 && i > 0) dumpEl.innerHTML += '<br>';
+                dumpEl.innerHTML += memory[i].toString().padStart(5) + ' ';
+            }
+        }
+        
+        function showGameState() {
+            if (!gameInstance) return;
+            
+            const score = gameModule._game_get_score(gameInstance);
+            const dumpEl = document.getElementById('memory-dump');
+            dumpEl.innerHTML = `<strong>Game State:</strong><br>
+                Score: ${score}<br>
+                Board Pointer: 0x${gameModule._game_get_board_ptr(gameInstance).toString(16)}<br>
+                Board Size: ${gameModule._game_get_board_size(gameInstance)}`;
+        }
+        
+        function stepAI() {
+            // TODO: Implement AI step
+            console.log('AI step not yet implemented');
+        }
+        
+        function resetGame() {
+            // TODO: Implement game reset
+            console.log('Game reset not yet implemented');
+        }
+        
+        // Keyboard input handler
+        document.addEventListener('keydown', (e) => {
+            const key = keyMap[e.key];
+            if (key) {
+                e.preventDefault();
+                window.lastKeyPressed = key.charCodeAt(0);
+                
+                if (gameInstance && gameModule) {
+                    gameModule._game_handle_input(gameInstance, window.lastKeyPressed);
+                }
+            }
+        });
+        
+        // Load the WebAssembly module
+        const script = document.createElement('script');
+        script.src = '../2048.js';
+        script.onload = () => {
+            Game2048().then((Module) => {
+                gameModule = Module;
+                console.log('2048 WASM loaded successfully');
+                
+                // Initialize the game
+                // gameInstance = gameModule._gamestate_init();
+            });
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>

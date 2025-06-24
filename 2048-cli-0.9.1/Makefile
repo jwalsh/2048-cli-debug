@@ -42,4 +42,29 @@ extract-source: 2048-cli-v0.9.1.tar.gz
 		echo "Source already extracted"; \
 	fi
 
-.PHONY: clean remake download-source archive-source extract-source
+# WebAssembly build
+wasm: $(FILTERED_C_FILES) src/gfx_web.c
+	emcc $(FILTERED_C_FILES) $(MERGE_FILE) src/gfx_web.c \
+		-o 2048.js \
+		-s WASM=1 \
+		-s EXPORTED_FUNCTIONS='["_main", "_game_handle_input", "_game_get_board_ptr", "_game_get_board_size", "_game_get_score"]' \
+		-s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
+		-s MODULARIZE=1 \
+		-s EXPORT_NAME='Game2048' \
+		-s ALLOW_MEMORY_GROWTH=1 \
+		-O2
+
+wasm-debug: $(FILTERED_C_FILES) src/gfx_web.c
+	emcc $(FILTERED_C_FILES) $(MERGE_FILE) src/gfx_web.c \
+		-o 2048-debug.js \
+		-s WASM=1 \
+		-s EXPORTED_FUNCTIONS='["_main", "_game_handle_input", "_game_get_board_ptr", "_game_get_board_size", "_game_get_score"]' \
+		-s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
+		-s MODULARIZE=1 \
+		-s EXPORT_NAME='Game2048' \
+		-s ALLOW_MEMORY_GROWTH=1 \
+		-g4 \
+		-s ASSERTIONS=2 \
+		-s SAFE_HEAP=1
+
+.PHONY: clean remake download-source archive-source extract-source wasm wasm-debug
