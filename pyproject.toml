@@ -1,0 +1,13 @@
+[project]
+name = "tty-2048-controller"
+version = "0.1.0"
+description = "TTY-based controller for 2048 CLI game with manual inspection points"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.2.1",
+]
+
+[project.scripts]
+tty-reader = "tty_manual.tty_reader:main"
+manual-test = "tty_manual.run_manual_test:main"

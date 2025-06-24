@@ -13,6 +13,7 @@ import time
 import re
 import json
 from datetime import datetime
+import click
 
 class TTYReader:
     """Reads 2048 game output from a pseudo-terminal"""
@@ -169,41 +170,71 @@ class TTYReader:
             self.process.wait()
 
 
-# Test function
-if __name__ == "__main__":
-    print("Testing TTY Reader...")
+@click.command()
+@click.option('--game-binary', default='2048-cli-0.9.1/2048', help='Path to 2048 binary')
+@click.option('--moves', '-m', multiple=True, help='Moves to execute (w/a/s/d)')
+@click.option('--output', '-o', help='Save board snapshot to file')
+@click.option('--interactive', '-i', is_flag=True, help='Interactive mode')
+def main(game_binary, moves, output, interactive):
+    """Test TTY reader for 2048 game"""
+    click.echo("Starting TTY Reader...")
     
-    reader = TTYReader()
+    reader = TTYReader(game_binary)
     reader.start_game()
     
     # Wait for initial board
     time.sleep(0.5)
-    output = reader.read_output()
-    print("Initial output length:", len(output))
+    initial_output = reader.read_output()
     
-    if reader.parse_board_state(output):
-        print(f"Score: {reader.current_score}")
-        print(f"High Score: {reader.high_score}")
-        print("Board:")
+    if reader.parse_board_state(initial_output):
+        click.echo(f"Score: {reader.current_score}")
+        click.echo(f"High Score: {reader.high_score}")
+        click.echo("\nInitial Board:")
         for row in reader.current_board:
-            print(row)
-            
-        # Save snapshot
-        reader.save_board_snapshot("test_board.txt")
-        print("Saved board to test_board.txt")
+            click.echo(f"  {row}")
     else:
-        print("Failed to parse board")
-        print("Raw output:")
-        print(output[:500])
+        click.echo("Failed to parse initial board", err=True)
+        reader.cleanup()
+        return
     
-    # Test a move
-    print("\nSending move: down")
-    reader.send_move('s')
-    time.sleep(0.5)
+    # Execute provided moves
+    for move in moves:
+        if move in ['w', 'a', 's', 'd']:
+            click.echo(f"\nSending move: {move}")
+            reader.send_move(move)
+            time.sleep(0.3)
+            
+            reader.read_output()
+            if reader.parse_board_state():
+                click.echo(f"Score: {reader.current_score}")
+                for row in reader.current_board:
+                    click.echo(f"  {row}")
     
-    output = reader.read_output()
-    if reader.parse_board_state():
-        print(f"New score: {reader.current_score}")
+    # Interactive mode
+    if interactive:
+        click.echo("\nInteractive mode (w/a/s/d to move, q to quit):")
+        while True:
+            move = click.getchar()
+            if move == 'q':
+                break
+            elif move in ['w', 'a', 's', 'd']:
+                reader.send_move(move)
+                time.sleep(0.3)
+                reader.read_output()
+                if reader.parse_board_state():
+                    click.clear()
+                    click.echo(f"Score: {reader.current_score}")
+                    for row in reader.current_board:
+                        click.echo(f"  {row}")
+    
+    # Save final board if requested
+    if output:
+        reader.save_board_snapshot(output)
+        click.echo(f"\nSaved board to {output}")
     
     reader.cleanup()
-    print("Test complete!")
+    click.echo("Done!")
+
+
+if __name__ == "__main__":
+    main()
