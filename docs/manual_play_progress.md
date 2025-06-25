@@ -1,0 +1,50 @@
+# Manual Play Progress Report
+
+## Current Status (Score: 84)
+- Playing via tmux: `tmux send-keys -t game2048 [move]`
+- Started from score 0, now at 84
+- Highest tile: 16
+- Board state:
+```
+|      |      |    2 |    4 |
+|      |      |      |    8 |
+|      |      |    4 |    8 |
+|    4 |    2 |    8 |   16 |
+```
+
+## Move History & Learning
+1. Initial moves: s,d,s,d,a → Score 0→4→8→16
+2. Continued with manual moves → Score progression: 20→28→44→48→56→60→68→72→76→84
+
+## Strategies Discovered
+1. **Keep largest tile in corner** - Currently 16 is bottom-right ✓
+2. **Build in order** - Have 16→8→4→2 sequence building
+3. **Merge pairs opportunistically** - Merged multiple 4s into 8s
+4. **Use LEFT sparingly** - Only when stuck to create space
+5. **DOWN-RIGHT primary pattern** - Most reliable for building
+
+## Heuristics Observed
+- When you have matching tiles in a column, DOWN merges them
+- When you have matching tiles in a row, RIGHT merges them  
+- Score increases by sum of merged tiles (2+2=4 gives +4 score)
+- New tiles appear in random empty positions (usually 2s, sometimes 4s)
+
+## Path to 2048
+- Current: 16
+- Need: 16→32→64→128→256→512→1024→2048
+- That's 7 more doublings!
+- Rough estimate: ~100-200 more moves if played well
+
+## Command Log Template
+```bash
+# Check current state
+tmux capture-pane -t game2048 -p | head -10
+
+# Make move
+tmux send-keys -t game2048 [s/d/a/w]
+
+# Check result
+sleep 0.2 && tmux capture-pane -t game2048 -p | head -10
+```
+
+"The boring is the learning" - User, 2024 🎮
