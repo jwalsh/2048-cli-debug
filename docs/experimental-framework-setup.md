@@ -1,0 +1,148 @@
+# Experimental Framework Setup
+
+This document captures the process of reorganizing the 2048 debugging experiments into a standardized, portable framework.
+
+## Background
+
+During the evolution of experiments 007-011, several organizational issues emerged that needed systematic resolution. This led to the creation of GitHub issue #15 to track the experimental framework setup.
+
+## Issues Encountered and Resolutions
+
+### 1. Hardcoded Paths
+
+**Issue**: Experiments contained hardcoded absolute paths like `/Users/jasonwalsh/projects/...`
+
+**Resolution**: Replaced all hardcoded paths with relative paths:
+```bash
+# Before
+/Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+
+# After  
+../../2048-cli-0.9.1
+```
+
+### 2. Missing :mkdirp yes in Tangle Blocks
+
+**Issue**: When tangling exp_011, Emacs failed with "No such file or directory" because the exp_011/scripts/ directory didn't exist.
+
+**Resolution**: Added `:mkdirp yes` to all tangle blocks that create files in subdirectories:
+```org
+#+begin_src bash :tangle exp_011/scripts/exp_011_timing_curve.sh :shebang #!/bin/bash :mkdirp yes
+```
+
+**Learning**: Always include `:mkdirp yes` when tangling to subdirectories to ensure they're created automatically.
+
+### 3. Inconsistent File Organization
+
+**Issue**: Generated files (scripts, data, images) were scattered in the experiments/ root directory, making it difficult to track which files belonged to which experiment.
+
+**Resolution**: Created exp_NNN/ subdirectories for each experiment:
+```
+experiments/
+├── exp_007/
+│   ├── scripts/
+│   ├── data/
+│   └── benchmarks/
+├── exp_008/
+│   └── (generated files)
+└── exp_009/
+    └── (generated files)
+```
+
+### 4. Tangle Path Consistency
+
+**Issue**: Tangle paths were inconsistent - some used "scripts/", others used no prefix.
+
+**Resolution**: Standardized all tangle paths to use exp_NNN/ prefix:
+```org
+# All experiments now use consistent paths
+:tangle exp_007/scripts/verify_memory_layout.sh
+:tangle exp_008/exp_008_analysis.py
+:tangle exp_009/scripts/exp_009_deep_run.sh
+```
+
+### 5. Working Directory for Tangling
+
+**Issue**: Initial attempts to tangle from within the experiments/ directory failed.
+
+**Resolution**: Always run org-babel-tangle from the project root:
+```bash
+# Correct approach
+cd /path/to/project/root
+emacs --batch -l org --eval "(progn (find-file \"experiments/exp_011_timing_curve_analysis.org\") (org-babel-tangle))"
+```
+
+### 6. Binary Resolution
+
+**Issue**: Scripts had inconsistent ways of finding the 2048-debug binary.
+
+**Resolution**: 
+- Created `.envrc` with PROJECT_ROOT and GAME_DIR variables
+- Standardized binary location references:
+```bash
+cd ../../2048-cli-0.9.1
+./2048-debug
+```
+
+### 7. Org-mode Syntax Consistency
+
+**Issue**: Mixed markdown and org-mode syntax (backticks vs tildes, ** vs *)
+
+**Resolution**: Fixed all org files to use proper org-mode syntax:
+- Code: ~code~ (not `code`)
+- Bold: *bold* (not **bold**)
+
+### 8. tmux Session Management
+
+**Issue**: tmux sessions failed to start with relative paths like "./2048-debug"
+
+**Resolution**: Use proper working directory setup:
+```bash
+# Bad
+tmux new-session -d -s "name" "./2048-debug"
+
+# Good
+tmux new-session -d -s "name" -c "$GAME_DIR" "$GAME_DIR/2048-debug"
+```
+
+## Process Documentation
+
+### GitHub Issue Creation
+
+Created issue #15 to track all framework setup tasks:
+```bash
+gh issue create --title "Set up experimental framework with standardized nomenclature and layout"
+```
+
+This provided a central place to track:
+- Directory structure requirements
+- Path management needs
+- Org-mode standards
+- Current status with checkboxes
+
+### Verification Process
+
+1. **Baseline before changes**: Created baseline_before_tangle.txt
+2. **Run tangle on all experiments**: Verified files go to correct locations
+3. **Check for duplicates**: Ensured no files in experiments/ root
+4. **Diff to verify**: Compared before/after to confirm proper organization
+
+## Lessons Learned
+
+1. **Always use :mkdirp yes** when tangling to subdirectories
+2. **Run tangle from project root**, not from within experiments/
+3. **Use relative paths** for portability across systems
+4. **Create GitHub issues** to track multi-step reorganizations
+5. **Test with mini pilots** before full experiments (learned from exp_008)
+6. **Document failures** - they're valuable learning experiences
+
+## Current State
+
+All experiments (007-011) are now:
+- ✅ Organized in exp_NNN/ subdirectories
+- ✅ Using relative paths throughout
+- ✅ Properly tangling to their own directories
+- ✅ Following consistent org-mode syntax
+- ✅ Documented with clear hypotheses and results
+
+The framework is ready for future experiments to follow the same pattern using the EXPERIMENT_TEMPLATE.org.
