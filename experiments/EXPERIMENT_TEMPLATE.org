@@ -1,0 +1,192 @@
+#+TITLE: Experiment #XXX: [Brief Title]
+#+DATE: [YYYY-MM-DD]
+
+[[file:exp_XXX_visualization.png]]  # Optional: Add key visualization at top
+
+* EXPERIMENT #XXX: [Full Descriptive Title]
+:PROPERTIES:
+:ID: exp-XXX-[hyphenated-title]
+:HYPOTHESIS: [One-line hypothesis statement]
+:END:
+
+** HYPOTHESIS
+[Detailed hypothesis with specific, measurable predictions]
+1. [Prediction 1 with expected values]
+2. [Prediction 2 with expected values]
+3. [Prediction 3 with expected values]
+
+Use org-mode formatting:
+- Literals: ~code~, ~values~, ~commands~
+- Bold: *important concepts*
+- Links: [[file:other_exp.org][Related Experiment]]
+
+** RATIONALE
+[Why this experiment matters and what gap it fills]
+- What question does this answer?
+- How does it build on previous work?
+- What will we learn?
+
+** METHOD
+*** Setup
+#+begin_src bash :tangle scripts/exp_XXX_setup.sh :shebang #!/bin/bash
+# Environment preparation
+echo "=== Experiment #XXX Setup ==="
+
+# Clean environment
+pkill -f relevant-process 2>/dev/null
+tmux kill-server 2>/dev/null || true
+
+# Build/prepare
+make clean && make target
+#+end_src
+
+*** Data Collection
+#+begin_src bash :tangle scripts/exp_XXX_collect.sh :shebang #!/bin/bash
+# Main experiment script
+echo "run,metric1,metric2,timestamp" > exp_XXX_results.csv
+
+for run in {1..N}; do
+    # Experiment logic here
+    echo "$run,$METRIC1,$METRIC2,$(date +%s)" >> exp_XXX_results.csv
+done
+#+end_src
+
+*** Analysis
+#+begin_src python :tangle scripts/exp_XXX_analysis.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+
+# Load and analyze results
+csv_path = os.path.join(os.path.dirname(__file__), '../exp_XXX_results.csv')
+df = pd.read_csv(csv_path)
+
+# Statistical analysis
+print("=== RESULTS ===")
+print(f"Mean: {df['metric1'].mean()}")
+print(f"Hypothesis test: {'PASS' if condition else 'FAIL'}")
+
+# Visualization
+plt.figure(figsize=(10, 6))
+# ... plotting code
+output_path = os.path.join(os.path.dirname(__file__), '../exp_XXX_visualization.png')
+plt.savefig(output_path)
+#+end_src
+
+** EXPECTED RESULTS
+[Specific, quantifiable predictions]
+1. Metric 1: Expected value ± tolerance
+2. Metric 2: Expected distribution
+3. Success criteria: [Clear pass/fail conditions]
+
+** OBSERVATIONS
+[Fill during experiment]
+*** Run Log
+- [Timestamp]: Started experiment
+- [Timestamp]: Unexpected behavior noted
+- [Timestamp]: Completed N runs
+
+*** Unexpected Findings
+[Document any surprises or deviations]
+
+** RESULTS
+*** Summary Statistics
+[Add after running analysis]
+- Mean: X
+- Std Dev: Y
+- Hypothesis test: PASS/FAIL
+
+*** Visualizations
+[[file:exp_XXX_visualization.png]]
+
+*** Raw Data
+Available in ~exp_XXX_results.csv~
+
+** ANALYSIS
+*** Hypothesis Validation
+[Did results match predictions? Why/why not?]
+
+*** Statistical Significance
+[If applicable, include p-values, confidence intervals]
+
+*** Comparison with Previous Work
+[How do these results relate to other experiments?]
+
+** CONCLUSION
+*** Key Findings
+1. *Finding 1*: [Clear statement of what was discovered]
+2. *Finding 2*: [Implications of the discovery]
+3. *Finding 3*: [What this means for future work]
+
+*** Lessons Learned
+[What went right/wrong with methodology?]
+
+*** Impact on Project
+[How does this change our understanding?]
+
+** REPRODUCIBILITY
+*** Environment
+#+begin_src yaml :tangle .expXXX/environment.yaml
+experiment:
+  id: exp-XXX-title
+  date: YYYY-MM-DD
+  
+environment:
+  os: macOS X.X
+  arch: arm64/x86_64
+  key_tools:
+    - tool1 version
+    - tool2 version
+#+end_src
+
+*** Reproduction Instructions
+#+begin_src bash :tangle scripts/reproduce_exp_XXX.sh :shebang #!/bin/bash
+# Complete reproduction script
+echo "=== Reproducing Experiment #XXX ==="
+
+# Step-by-step reproduction
+./scripts/exp_XXX_setup.sh
+./scripts/exp_XXX_collect.sh
+python3 scripts/exp_XXX_analysis.py
+#+end_src
+
+*** Verification Tests
+#+begin_src bash :tangle scripts/verify_exp_XXX.sh :shebang #!/bin/bash
+# Automated verification of key findings
+EXPECTED_MEAN=X
+ACTUAL_MEAN=$(awk -F, 'NR>1 {sum+=$2} END {print sum/(NR-1)}' exp_XXX_results.csv)
+
+# Compare with tolerance
+# ... verification logic
+#+end_src
+
+** RAW DATA ARCHIVE
+*** Session Logs
+#+begin_src text :tangle data/exp_XXX_session.log
+[Preserve interesting session output]
+#+end_src
+
+*** Key Commands
+#+begin_src text :tangle data/exp_XXX_commands.txt
+# Exact commands that produced key results
+command 1
+command 2
+#+end_src
+
+** FUTURE WORK
+[What experiments does this enable or suggest?]
+1. Experiment #XXX+1: [Natural follow-up]
+2. Alternative approach: [Different methodology to test same thing]
+3. Deeper investigation: [Drill down on interesting finding]
+
+** RELATED EXPERIMENTS
+- [[file:exp_YYY.org][Experiment #YYY]]: [How it relates]
+- [[file:exp_ZZZ.org][Experiment #ZZZ]]: [How it relates]
+- Issue #N: [Related GitHub issue]
+
+# === METADATA (Do not edit manually) ===
+# Experiment-Status: PLANNING|IN-PROGRESS|COMPLETE|FAILED
+# Data-Files: exp_XXX_results.csv, exp_XXX_visualization.png
+# Scripts: setup.sh, collect.sh, analysis.py, reproduce.sh
+# Time-Estimate: X minutes/hours
+# Actual-Time: Y minutes/hours

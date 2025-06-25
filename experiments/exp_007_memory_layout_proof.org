@@ -10,8 +10,8 @@
 ** HYPOTHESIS
 The 2048 grid is stored as:
 1. 16 consecutive integers (4x4 grid)
-2. Row-major order: index = row * 4 + col
-3. Values encode as: 0=empty, 1=2, 2=4, 3=8, ..., n=2^n
+2. Row-major order: ~index = row * 4 + col~
+3. Values encode as: ~0=empty~, ~1=2~, ~2=4~, ~3=8~, ..., ~n=2^n~
 
 ** METHOD
 *** Step 1: Clean Environment
@@ -120,7 +120,7 @@ for i in {1..10}; do
     sleep 0.5
     
     # Start game with known seed (if possible)
-    tmux new-session -d -s verify_$i "./2048-debug"
+    tmux new-session -d -s verify_$i ~./2048-debug~
     sleep 1
     
     # Make controlled moves
