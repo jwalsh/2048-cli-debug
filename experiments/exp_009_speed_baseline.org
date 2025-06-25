@@ -168,6 +168,151 @@ Max: 152
 - For 100 runs of 150 moves: ~46 minutes
 - This is actually SLOWER than tmux approach!
 
+** DEEP RUN: 100 runs with 40 moves
+*** Deep Run Script
+#+begin_src bash :tangle exp_009_deep_run.sh :shebang #!/bin/bash
+# Deep run: 100 runs with 40 moves each
+cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+
+echo "=== Deep Run: 100 runs of 40 moves each ==="
+echo "run,score,time_s,max_tile" > exp_009_deep_results.csv
+
+# Move sequence (40 moves + quit) 
+MOVES="sdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdq"
+
+# Time the entire batch
+BATCH_START=$(date +%s.%N)
+
+for run in {1..100}; do
+    RUN_START=$(date +%s.%N)
+    
+    # Execute game with direct input
+    OUTPUT=$(echo "$MOVES" | ./2048-debug 2>&1)
+    
+    # Extract score
+    SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
+    
+    # Extract max tile
+    MAX_TILE=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | sort -nr | head -1)
+    
+    # Calculate time
+    RUN_END=$(date +%s.%N)
+    TIME_S=$(echo "$RUN_END - $RUN_START" | bc)
+    
+    # Save result
+    echo "$run,$SCORE,$TIME_S,$MAX_TILE" >> exp_009_deep_results.csv
+    
+    # Progress indicator
+    if (( run % 10 == 0 )); then
+        echo "Progress: $run/100 runs completed"
+    fi
+done
+
+BATCH_END=$(date +%s.%N)
+TOTAL_TIME=$(echo "$BATCH_END - $BATCH_START" | bc)
+
+echo -e "\n=== TIMING STATISTICS ==="
+echo "Total time: ${TOTAL_TIME}s"
+echo "Average time per run: $(echo "scale=3; $TOTAL_TIME / 100" | bc)s"
+awk -F, 'NR>1 {sum+=$3; if($3>max)max=$3; if(min==""||$3<min)min=$3} END {
+    avg=sum/(NR-1); 
+    print "Min time: " min "s"; 
+    print "Max time: " max "s";
+    print "Avg time: " avg "s"
+}' exp_009_deep_results.csv
+
+echo -e "\n=== SCORE STATISTICS ==="
+awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {
+    avg=sum/(NR-1); 
+    print "Mean score: " avg; 
+    print "Min score: " min; 
+    print "Max score: " max
+}' exp_009_deep_results.csv
+
+# Max tile distribution
+echo -e "\n=== MAX TILE DISTRIBUTION ==="
+awk -F, 'NR>1 {tiles[$4]++} END {for (t in tiles) print t ": " tiles[t] " (" tiles[t] "%)"}' exp_009_deep_results.csv | sort -n
+#+end_src
+
+*** Analysis Script
+#+begin_src python :tangle exp_009_analysis.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Load results
+df = pd.read_csv('exp_009_deep_results.csv')
+
+# Create figure with subplots
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+fig.suptitle('2048 Deep Run Analysis: 100 runs, 40 moves each', fontsize=16)
+
+# 1. Score distribution histogram
+ax1.hist(df['score'], bins=20, edgecolor='black', alpha=0.7, color='steelblue')
+ax1.axvline(df['score'].mean(), color='red', linestyle='--', linewidth=2, label=f'Mean: {df["score"].mean():.1f}')
+ax1.axvline(df['score'].median(), color='green', linestyle='--', linewidth=2, label=f'Median: {df["score"].median():.1f}')
+ax1.set_xlabel('Score')
+ax1.set_ylabel('Frequency')
+ax1.set_title('Score Distribution')
+ax1.legend()
+ax1.grid(True, alpha=0.3)
+
+# 2. Timing distribution histogram
+ax2.hist(df['time_s'], bins=15, edgecolor='black', alpha=0.7, color='darkgreen')
+ax2.axvline(df['time_s'].mean(), color='red', linestyle='--', linewidth=2, label=f'Mean: {df["time_s"].mean():.2f}s')
+ax2.set_xlabel('Time (seconds)')
+ax2.set_ylabel('Frequency')
+ax2.set_title('Timing Distribution')
+ax2.legend()
+ax2.grid(True, alpha=0.3)
+
+# 3. Score vs Run Number (to check for patterns)
+ax3.scatter(df['run'], df['score'], alpha=0.6, s=30)
+ax3.plot(df['run'], df['score'].rolling(10).mean(), color='red', linewidth=2, label='10-run moving avg')
+ax3.set_xlabel('Run Number')
+ax3.set_ylabel('Score')
+ax3.set_title('Score Progression')
+ax3.legend()
+ax3.grid(True, alpha=0.3)
+
+# 4. Max tile distribution
+tile_counts = df['max_tile'].value_counts().sort_index()
+ax4.bar(tile_counts.index.astype(str), tile_counts.values, color='orange', edgecolor='black')
+ax4.set_xlabel('Max Tile')
+ax4.set_ylabel('Count')
+ax4.set_title('Max Tile Distribution')
+ax4.grid(True, alpha=0.3, axis='y')
+
+# Add percentage labels on bars
+for i, (tile, count) in enumerate(tile_counts.items()):
+    ax4.text(i, count + 0.5, f'{count/len(df)*100:.1f}%', ha='center')
+
+plt.tight_layout()
+plt.savefig('exp_009_deep_analysis.png', dpi=150, bbox_inches='tight')
+
+# Print detailed statistics
+print("=== DETAILED STATISTICS ===")
+print(f"\nScore Statistics:")
+print(f"  Mean: {df['score'].mean():.2f}")
+print(f"  Std Dev: {df['score'].std():.2f}")
+print(f"  Median: {df['score'].median()}")
+print(f"  Q1: {df['score'].quantile(0.25)}")
+print(f"  Q3: {df['score'].quantile(0.75)}")
+
+print(f"\nTiming Statistics:")
+print(f"  Mean: {df['time_s'].mean():.3f}s")
+print(f"  Std Dev: {df['time_s'].std():.3f}s")
+print(f"  Min: {df['time_s'].min():.3f}s")
+print(f"  Max: {df['time_s'].max():.3f}s")
+
+print(f"\nMax Tile Distribution:")
+for tile, count in tile_counts.items():
+    print(f"  {tile}: {count} ({count/len(df)*100:.1f}%)")
+#+end_src
+
+*** Deep Run Results
+[To be filled after running]
+
 ** CONCLUSION
 1. **Surprising Result**: Direct input is NOT faster than tmux
    - Direct: ~3.4s for 20 moves
