@@ -81,4 +81,8 @@ experiments/README.txt: experiments/README.org
 	@mv experiments/README.txt experiments/README.txt 2>/dev/null || true
 	@echo "Published to experiments/README.txt"
 
-.PHONY: clean remake all terminal curses sdl debug-terminal debug-curses debug-sdl gdb-run
+deps:
+	## Install dependencies
+	@scripts/deps.sh
+
+.PHONY: clean remake all terminal curses sdl debug-terminal debug-curses debug-sdl gdb-run deps
