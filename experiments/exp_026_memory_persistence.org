@@ -1,0 +1,286 @@
+#+TITLE: Experiment #026: LLDB Memory Persistence - Save/Load Game State
+#+DATE: [2025-06-25]
+#+STATUS: IN-PROGRESS
+
+* EXPERIMENT #026: LLDB Memory Persistence - Save/Load Game State
+:PROPERTIES:
+:ID: exp-026-memory-persistence
+:HYPOTHESIS: LLDB can dump and restore game state like Python's pickle
+:STATUS: IN-PROGRESS
+:END:
+
+** HYPOTHESIS
+LLDB provides mechanisms to:
+1. Save complete game state to disk (like Python's pickle)
+2. Restore game state from saved files
+3. Create save/load functionality without modifying game code
+4. Enable "save scumming" and state sharing
+
+** RATIONALE
+Having save/load functionality would enable:
+- Perfect reproducibility of interesting game states
+- Sharing specific board configurations
+- AI training on diverse board positions
+- Time-travel debugging capabilities
+
+** METHOD
+
+*** Approach 1: Core Dump (Full Process Snapshot)
+
+**** Save Complete Process State
+#+begin_src lldb :tangle exp_026/save_core.lldb :mkdirp yes
+# Save full core dump (entire process memory)
+process save-core --style full game_state_full.core
+
+# Save only modified memory (more efficient)
+process save-core --style modified-memory game_state_modified.core
+
+# Save just the stack
+process save-core --style stack game_state_stack.core
+#+end_src
+
+**** Restore from Core Dump
+#+begin_src bash :tangle exp_026/restore_core.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Load the core file in LLDB
+lldb -c game_state_full.core ./2048-debug
+
+# The process will be restored to exact state
+# All memory, registers, and execution point preserved
+#+end_src
+
+*** Approach 2: Targeted Memory Dump (Game State Only)
+
+**** Binary Memory Dump
+#+begin_src lldb :tangle exp_026/save_memory.lldb :mkdirp yes
+# Dump the game state structure
+memory read --outfile game_state.bin --binary --count 200 g
+
+# Dump just the grid (16 integers = 64 bytes)
+memory read --outfile grid.bin --binary --count 64 g->grid_data_ptr
+
+# Dump with specific format
+memory read --outfile grid.txt --count 16 --format "int32_t[]" g->grid_data_ptr
+#+end_src
+
+**** Python Scripting for Structured Save
+#+begin_src python :tangle exp_026/save_game_state.py :mkdirp yes
+# save_game_state.py - LLDB Python script
+import lldb
+import pickle
+import struct
+
+def save_game_state(debugger, command, result, internal_dict):
+    target = debugger.GetSelectedTarget()
+    process = target.GetProcess()
+    thread = process.GetSelectedThread()
+    frame = thread.GetSelectedFrame()
+    
+    # Get game state pointer
+    g = frame.FindVariable("g")
+    
+    # Extract all relevant data
+    game_data = {
+        'score': g.GetChildMemberWithName('score').GetValueAsSigned(),
+        'score_high': g.GetChildMemberWithName('score_high').GetValueAsSigned(),
+        'gridsize': g.GetChildMemberWithName('gridsize').GetValueAsSigned(),
+        'grid': []
+    }
+    
+    # Read grid data
+    grid_ptr = g.GetChildMemberWithName('grid_data_ptr').GetValueAsUnsigned()
+    error = lldb.SBError()
+    
+    for i in range(16):
+        addr = grid_ptr + (i * 4)
+        data = process.ReadMemory(addr, 4, error)
+        value = struct.unpack('<I', data)[0]
+        game_data['grid'].append(value)
+    
+    # Save to pickle file
+    with open('game_state.pickle', 'wb') as f:
+        pickle.dump(game_data, f)
+    
+    print(f"Game state saved! Score: {game_data['score']}")
+
+# Register command
+def __lldb_init_module(debugger, internal_dict):
+    debugger.HandleCommand('command script add -f save_game_state.save_game_state save_game')
+#+end_src
+
+*** Approach 3: Memory Write for Restoration
+
+**** Write Memory Back
+#+begin_src lldb :tangle exp_026/restore_memory.lldb :mkdirp yes
+# Restore grid from binary file
+memory write g->grid_data_ptr --infile grid.bin
+
+# Write individual values
+memory write g->score 1234
+memory write g->grid_data_ptr[0] 0x00000001
+
+# Write multiple values at once
+memory write g->grid_data_ptr '0 0 1 2 0 1 2 3 1 2 3 4 2 3 4 5'
+#+end_src
+
+*** Complete Save/Load Implementation
+
+**** Save Script
+#+begin_src bash :tangle exp_026/save_2048_state.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# save_2048_state.sh
+
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="exp_026/saves/$TIMESTAMP"
+mkdir -p "$SAVE_DIR"
+
+# Get process ID
+PID=$(pgrep 2048-debug)
+
+if [ -z "$PID" ]; then
+    echo "Error: 2048-debug not running"
+    exit 1
+fi
+
+# Attach LLDB and save state
+lldb -p $PID <<EOF
+# Save core
+process save-core --style modified-memory $SAVE_DIR/state.core
+
+# Save specific memory regions
+memory read --outfile $SAVE_DIR/grid.bin --binary --count 64 g->grid_data_ptr
+memory read --outfile $SAVE_DIR/gamestate.bin --binary --count 100 g
+
+# Save human-readable state
+print g->score > $SAVE_DIR/score.txt
+print g->blocks_in_play > $SAVE_DIR/blocks.txt
+memory read --count 16 --format x g->grid_data_ptr > $SAVE_DIR/grid_hex.txt
+
+# Print state for verification
+print "State saved to $SAVE_DIR"
+print g->score
+print g->blocks_in_play
+
+detach
+quit
+EOF
+
+echo "Game state saved to $SAVE_DIR"
+#+end_src
+
+**** Load Script
+#+begin_src bash :tangle exp_026/load_2048_state.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# load_2048_state.sh
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <save_directory>"
+    exit 1
+fi
+
+SAVE_DIR="$1"
+
+if [ ! -d "$SAVE_DIR" ]; then
+    echo "Error: Save directory not found: $SAVE_DIR"
+    exit 1
+fi
+
+# Start new game with restored state
+lldb ./2048-debug <<EOF
+# Set breakpoint after initialization
+breakpoint set -n gamestate_tick
+run
+
+# Wait for game to initialize
+# Restore memory from files
+memory write g->grid_data_ptr --infile $SAVE_DIR/grid.bin
+memory write g --infile $SAVE_DIR/gamestate.bin
+
+# Clear breakpoint and continue
+breakpoint delete 1
+continue
+EOF
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Core dumps*: Should create 10-50MB files with complete process state
+2. *Binary dumps*: Grid ~64 bytes, gamestate ~200 bytes
+3. *Restoration accuracy*: 100% for memory contents
+4. *Performance*: Save <1s, Load <2s
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** CURRENT STATUS
+
+This experiment is IN-PROGRESS. Areas to investigate:
+
+1. *Core dump portability*: Can cores be loaded on different machines?
+2. *ASLR impact*: How does address randomization affect restoration?
+3. *Partial restoration*: Can we restore just game state, not full process?
+4. *State validation*: Ensuring restored state is playable
+
+** TECHNICAL CHALLENGES
+
+*** Address Space Layout Randomization (ASLR)
+- Memory addresses change between runs
+- Need position-independent restoration
+
+*** External State
+- Terminal state not captured
+- Random seed may differ
+- File descriptors lost
+
+*** Process Resources
+- PIDs will differ
+- Thread IDs change
+- Signal handlers need re-registration
+
+** CREATIVE APPLICATIONS
+
+1. *Save Scumming*: Save before risky moves, restore if failed
+2. *State Sharing*: Share interesting board positions
+3. *Replay System*: Save state at each move for perfect replay
+4. *AI Training*: Generate thousands of board states for analysis
+5. *Debugging*: Reproduce exact bug conditions
+
+** IMPLEMENTATION NOTES
+
+*** Quick Save/Load Interface
+#+begin_src bash :tangle exp_026/quicksave.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Quick save/load for active LLDB session
+
+case "$1" in
+    save)
+        echo "memory read --outfile quicksave.bin --binary --count 200 g"
+        echo "print \"Game saved!\""
+        ;;
+    load)
+        echo "memory write g --infile quicksave.bin"
+        echo "continue"
+        ;;
+    *)
+        echo "Usage: $0 {save|load}"
+        ;;
+esac
+#+end_src
+
+** NEXT STEPS
+
+1. Test core dump restoration across different builds
+2. Implement state verification checksums
+3. Create GUI for save/load management
+4. Test with various board configurations
+5. Measure performance impact
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: LLDB memory inspection basics
+- [[file:exp_005_ui_memory_alignment.org][Experiment #005]]: UI/memory synchronization issues
+- [[file:exp_020_save_restore.org][Experiment #020]]: Save/restore workflow concepts
+
+** CONCLUSION
+[To be completed after experiment execution]
+
+The answer appears to be YES - LLDB can absolutely dump and restore memory like Python's pickle, with even more power since it can snapshot the entire process state!

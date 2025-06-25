@@ -1,0 +1,390 @@
+#+TITLE: Experiment #027: Core Dump Restoration - Loading Saved Game States
+#+DATE: [2025-06-25]
+#+STATUS: IN-PROGRESS
+
+* EXPERIMENT #027: Core Dump Restoration - Loading Saved Game States
+:PROPERTIES:
+:ID: exp-027-core-dump-restoration
+:HYPOTHESIS: Core dumps can restore complete game state for continuation
+:STATUS: IN-PROGRESS
+:END:
+
+** HYPOTHESIS
+Core dumps saved with ~process save-core~ can be loaded to:
+1. Restore exact game state from any point
+2. Continue playing from the saved position
+3. Work across different debugging sessions
+4. Enable time-travel debugging
+
+** RATIONALE
+If core dumps provide true state restoration, we can:
+- Implement save/load without game modification
+- Share exact game states between users
+- Debug from precise moments
+- Create "save states" like emulators
+
+** METHOD
+
+*** Test Core Dump Loading
+
+**** Save Current State First
+#+begin_src bash :tangle exp_027/scripts/save_current_state.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Save current state before loading core dump
+
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="exp_027/saves/current_$TIMESTAMP"
+mkdir -p "$SAVE_DIR"
+
+PID=$(pgrep 2048-debug)
+if [ -z "$PID" ]; then
+    echo "Error: 2048-debug not running"
+    exit 1
+fi
+
+lldb -p $PID <<EOF
+# Save current state for comparison
+process save-core --style modified-memory $SAVE_DIR/current.core
+memory read --outfile $SAVE_DIR/grid.bin --binary --count 64 g->grid_data_ptr
+memory read --outfile $SAVE_DIR/gamestate.bin --binary --count 100 g
+print g->score > $SAVE_DIR/score.txt
+memory read --count 16 --format x g->grid_data_ptr > $SAVE_DIR/grid_hex.txt
+detach
+quit
+EOF
+
+echo "Current state saved to $SAVE_DIR"
+#+end_src
+
+**** Direct Core Load (New Process)
+#+begin_src bash :tangle exp_027/scripts/load_core_dump.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Load core dump in new LLDB session
+
+CORE_FILE="${1:-2048_state_score376.core}"
+
+if [ ! -f "$CORE_FILE" ]; then
+    echo "Error: Core file not found: $CORE_FILE"
+    exit 1
+fi
+
+echo "Loading core dump: $CORE_FILE"
+
+# Kill any existing 2048 processes
+pkill -f 2048-debug 2>/dev/null
+
+# Load core dump
+lldb -c "$CORE_FILE" ./2048-debug <<EOF
+# Verify restoration
+print g->score
+print g->blocks_in_play
+memory read --count 16 --format x g->grid_data_ptr
+
+# Attempt to continue execution
+continue
+EOF
+#+end_src
+
+**** Memory Restoration (Current Process)
+#+begin_src bash :tangle exp_027/scripts/restore_to_current.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Restore saved state to current running process
+
+SAVE_DIR="$1"
+if [ -z "$SAVE_DIR" ] || [ ! -d "$SAVE_DIR" ]; then
+    echo "Usage: $0 <save_directory>"
+    exit 1
+fi
+
+PID=$(pgrep 2048-debug)
+if [ -z "$PID" ]; then
+    echo "Error: 2048-debug not running"
+    exit 1
+fi
+
+lldb -p $PID <<EOF
+# Restore memory from saved files
+memory write g->grid_data_ptr --infile $SAVE_DIR/grid.bin
+memory write g --infile $SAVE_DIR/gamestate.bin
+
+# Verify restoration
+print "State restored from $SAVE_DIR"
+print g->score
+memory read --count 16 --format x g->grid_data_ptr
+
+# Continue game
+continue
+EOF
+#+end_src
+
+*** Test Different Restoration Approaches
+
+**** Approach 1: Full Core Replacement
+#+begin_src bash :tangle exp_027/scripts/test_full_core.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test full core dump restoration
+
+echo "=== Testing Full Core Dump Restoration ==="
+
+# 1. Start fresh game
+echo "Starting fresh game..."
+tmux new-session -d -s core_test "./2048-debug"
+sleep 2
+
+# 2. Play some moves
+echo "Playing some moves..."
+tmux send-keys -t core_test "d" "s" "d" "s"
+sleep 1
+
+# 3. Save state
+echo "Saving state..."
+PID=$(pgrep 2048-debug)
+lldb -p $PID <<EOF
+process save-core --style full exp_027/test_state.core
+print g->score
+detach
+quit
+EOF
+
+# 4. Continue playing
+echo "Playing more moves..."
+tmux send-keys -t core_test "a" "w" "d" "s"
+sleep 1
+
+# 5. Kill and restore
+echo "Killing process and restoring from core..."
+tmux kill-session -t core_test
+sleep 1
+
+# 6. Load core dump
+lldb -c exp_027/test_state.core ./2048-debug
+#+end_src
+
+**** Approach 2: Hybrid Comparison
+#+begin_src bash :tangle exp_027/scripts/compare_states.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Compare states between core dump and live process
+
+CORE_FILE="$1"
+if [ -z "$CORE_FILE" ]; then
+    echo "Usage: $0 <core_file>"
+    exit 1
+fi
+
+# Start two LLDB sessions for comparison
+echo "=== Core Dump State ==="
+lldb -c "$CORE_FILE" ./2048-debug -o "print g->score" -o "memory read --count 16 --format d g->grid_data_ptr" -o "quit" 2>/dev/null | grep -v "^(lldb)"
+
+echo -e "\n=== Live Process State ==="
+PID=$(pgrep 2048-debug)
+if [ -n "$PID" ]; then
+    lldb -p $PID -o "print g->score" -o "memory read --count 16 --format d g->grid_data_ptr" -o "detach" -o "quit" 2>/dev/null | grep -v "^(lldb)"
+else
+    echo "No live process found"
+fi
+#+end_src
+
+*** Test ASLR and Portability
+
+**** ASLR Impact Test
+#+begin_src bash :tangle exp_027/scripts/test_aslr.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test if ASLR affects core dump restoration
+
+echo "=== Testing ASLR Impact on Core Dumps ==="
+
+# Save addresses from original process
+PID=$(pgrep 2048-debug)
+if [ -n "$PID" ]; then
+    echo "Original process addresses:"
+    lldb -p $PID <<EOF | grep "grid_data_ptr\|score" | head -5
+print &g
+print &g->grid_data_ptr
+print &g->score
+detach
+quit
+EOF
+fi
+
+# Load core dump and check addresses
+if [ -f "exp_027/test_state.core" ]; then
+    echo -e "\nCore dump addresses:"
+    lldb -c exp_027/test_state.core ./2048-debug <<EOF | grep "grid_data_ptr\|score" | head -5
+print &g
+print &g->grid_data_ptr  
+print &g->score
+quit
+EOF
+fi
+#+end_src
+
+**** Cross-Machine Portability
+#+begin_src bash :tangle exp_027/scripts/prepare_portable_save.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Prepare save bundle for cross-machine use
+
+BUNDLE_NAME="2048_save_$(date +%Y%m%d_%H%M%S)"
+BUNDLE_DIR="exp_027/bundles/$BUNDLE_NAME"
+mkdir -p "$BUNDLE_DIR"
+
+# Copy necessary files
+cp ./2048-debug "$BUNDLE_DIR/"
+cp exp_027/test_state.core "$BUNDLE_DIR/" 2>/dev/null || echo "No test core found"
+
+# Create restore script
+cat > "$BUNDLE_DIR/restore.sh" << 'RESTORE_EOF'
+#!/bin/bash
+# Portable restore script
+cd "$(dirname "$0")"
+lldb -c test_state.core ./2048-debug
+RESTORE_EOF
+
+chmod +x "$BUNDLE_DIR/restore.sh"
+
+# Create README
+cat > "$BUNDLE_DIR/README.txt" << 'README_EOF'
+2048 Save State Bundle
+=====================
+
+To restore this game state:
+1. Run: ./restore.sh
+2. Use 'continue' in LLDB to resume playing
+
+Note: Requires LLDB debugger installed
+README_EOF
+
+# Create tarball
+tar -czf "$BUNDLE_NAME.tar.gz" -C exp_027/bundles "$BUNDLE_NAME"
+echo "Portable bundle created: $BUNDLE_NAME.tar.gz"
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Core loading*: Should restore exact memory state
+2. *Continuation*: May or may not allow resuming execution
+3. *File descriptors*: Terminal connections likely lost
+4. *ASLR*: Addresses may differ but relative offsets preserved
+5. *Portability*: Same architecture should work
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** CURRENT STATUS
+
+This experiment is IN-PROGRESS. Key questions to investigate:
+
+1. *Process continuation*: Can we actually resume playing after core load?
+2. *Terminal state*: How to reconnect to terminal after restoration?
+3. *Signal handlers*: Do they need re-registration?
+4. *Performance*: Time to load and restore functionality
+
+** TECHNICAL CHALLENGES
+
+*** Process State Restoration
+- PID will be different
+- Thread IDs change
+- File descriptors invalid
+- Signal mask needs restoration
+
+*** Terminal Reconnection
+#+begin_src bash :tangle exp_027/scripts/reconnect_terminal.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Attempt to reconnect terminal after core load
+
+# Method 1: Use screen/tmux
+tmux new-session -d -s restored "lldb -c $1 ./2048-debug"
+tmux send-keys -t restored "continue" Enter
+tmux attach -t restored
+
+# Method 2: Direct terminal manipulation
+# stty sane
+# reset
+#+end_src
+
+*** External Dependencies
+- Random seed state
+- System time differences
+- Terminal capabilities
+- Environment variables
+
+** CREATIVE APPLICATIONS
+
+1. *Tournament Save States*: Standardized starting positions
+2. *Puzzle Mode*: Pre-configured challenging boards
+3. *Speed Run Verification*: Exact state reproduction
+4. *Collaborative Play*: Pass saves between players
+5. *Regression Testing*: Test from known states
+
+** IMPLEMENTATION NOTES
+
+*** Quick Test Script
+#+begin_src bash :tangle exp_027/scripts/quick_test.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Quick test of core dump save/load
+
+echo "1. Starting game..."
+./2048-debug &
+PID=$!
+sleep 2
+
+echo "2. Making some moves..."
+# Would need to send keys to the process
+
+echo "3. Saving core..."
+lldb -p $PID -o "process save-core quick.core" -o "detach" -o "quit"
+
+echo "4. Killing original..."
+kill $PID
+
+echo "5. Loading core..."
+lldb -c quick.core ./2048-debug
+#+end_src
+
+*** State Verification
+#+begin_src python :tangle exp_027/scripts/verify_state.py :mkdirp yes
+#!/usr/bin/env python3
+"""Verify game state from core dump matches expected values."""
+
+import struct
+import sys
+
+def read_core_metadata(core_file):
+    """Extract basic info from core dump."""
+    # This would need proper core file parsing
+    # For now, just a placeholder
+    print(f"Analyzing core dump: {core_file}")
+    
+def verify_grid_state(grid_bin, expected_values):
+    """Verify grid binary matches expected state."""
+    with open(grid_bin, 'rb') as f:
+        data = f.read()
+    
+    values = struct.unpack('<16I', data)
+    print("Grid values:", values)
+    
+    if expected_values:
+        matches = [v == e for v, e in zip(values, expected_values)]
+        print(f"Match rate: {sum(matches)}/{len(matches)}")
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        read_core_metadata(sys.argv[1])
+#+end_src
+
+** NEXT STEPS
+
+1. Complete basic save/load verification
+2. Test terminal reconnection methods  
+3. Measure restoration performance
+4. Test cross-build compatibility
+5. Create user-friendly wrappers
+
+** RELATED EXPERIMENTS
+- [[file:exp_026_memory_persistence.org][Experiment #026]]: Memory persistence techniques
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: LLDB memory inspection
+- [[file:exp_020_save_restore.org][Experiment #020]]: Save/restore workflow
+
+** CONCLUSION
+[To be completed after experiment execution]
+
+Core dumps provide powerful state restoration capabilities, but with significant caveats around process resources and external dependencies.
