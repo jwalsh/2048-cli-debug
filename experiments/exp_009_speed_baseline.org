@@ -1,7 +1,7 @@
 #+TITLE: Experiment #009: Speed Baseline - Direct Binary Input
 #+DATE: [2025-06-25]
 
-[[file:exp_009_deep_analysis.png]]
+[[file:exp_009/exp_009_deep_analysis.png]]
 
 * EXPERIMENT #009: Direct Binary Input Speed Test
 :PROPERTIES:
@@ -18,9 +18,9 @@ Feeding keystrokes directly to the 2048 binary stdin will:
 
 ** METHOD
 *** Quick Verification Script (1 run)
-#+begin_src bash :tangle exp_009_verify.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_009/exp_009_verify.sh :shebang #!/bin/bash
 # Single run to verify direct input works
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Direct Input Verification (20 moves + quit) ==="
 
@@ -44,12 +44,12 @@ echo "$OUTPUT" | grep -A 10 "Score:" | tail -11
 #+end_src
 
 *** Speed Test - 10 Runs Baseline
-#+begin_src bash :tangle exp_009_speed_test.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_009/exp_009_speed_test.sh :shebang #!/bin/bash
 # Speed baseline: 10 runs with direct input
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Speed Baseline: 10 runs of 20 moves each ==="
-echo "run,score,time_s" > exp_009_results.csv
+echo "run,score,time_s" > ../experiments/exp_009/exp_009_results.csv
 
 # Move sequence (20 moves + quit)
 MOVES="sdsdsdsdsdsdsdsdsdsdq"
@@ -71,7 +71,7 @@ for run in {1..10}; do
     TIME_S=$(echo "$RUN_END - $RUN_START" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S" >> exp_009_results.csv
+    echo "$run,$SCORE,$TIME_S" >> ../experiments/exp_009/exp_009_results.csv
     
     echo "Run $run: Score=$SCORE, Time=${TIME_S}s"
 done
@@ -85,7 +85,7 @@ echo "Average time per run: $(echo "scale=3; $TOTAL_TIME / 10" | bc)s"
 
 # Quick stats
 echo -e "\n=== SCORE STATISTICS ==="
-awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {print "Mean: " sum/(NR-1) "\nMin: " min "\nMax: " max}' exp_009_results.csv
+awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {print "Mean: " sum/(NR-1) "\nMin: " min "\nMax: " max}' ../experiments/exp_009/exp_009_results.csv
 
 # Extrapolation
 echo -e "\n=== EXTRAPOLATION ==="
@@ -95,9 +95,9 @@ echo "For 100 runs of 150 moves: ~$(echo "scale=0; $AVG_TIME * 7.5 * 100 / 60" |
 #+end_src
 
 *** Comparison Script
-#+begin_src bash :tangle exp_009_compare.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_009/exp_009_compare.sh :shebang #!/bin/bash
 # Compare direct input vs tmux approach (5 runs each for quick test)
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Speed Comparison: Direct vs tmux (5 runs each, 20 moves) ==="
 
@@ -172,12 +172,12 @@ Max: 152
 
 ** DEEP RUN: 100 runs with 40 moves
 *** Deep Run Script
-#+begin_src bash :tangle exp_009_deep_run.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_009/exp_009_deep_run.sh :shebang #!/bin/bash
 # Deep run: 100 runs with 40 moves each
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Deep Run: 100 runs of 40 moves each ==="
-echo "run,score,time_s,max_tile" > exp_009_deep_results.csv
+echo "run,score,time_s,max_tile" > ../experiments/exp_009/exp_009_deep_results.csv
 
 # Move sequence (40 moves + quit) 
 MOVES="sdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdsdq"
@@ -202,7 +202,7 @@ for run in {1..100}; do
     TIME_S=$(echo "$RUN_END - $RUN_START" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S,$MAX_TILE" >> exp_009_deep_results.csv
+    echo "$run,$SCORE,$TIME_S,$MAX_TILE" >> ../experiments/exp_009/exp_009_deep_results.csv
     
     # Progress indicator
     if (( run % 10 == 0 )); then
@@ -221,7 +221,7 @@ awk -F, 'NR>1 {sum+=$3; if($3>max)max=$3; if(min==""||$3<min)min=$3} END {
     print "Min time: " min "s"; 
     print "Max time: " max "s";
     print "Avg time: " avg "s"
-}' exp_009_deep_results.csv
+}' ../experiments/exp_009/exp_009_deep_results.csv
 
 echo -e "\n=== SCORE STATISTICS ==="
 awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {
@@ -229,21 +229,21 @@ awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {
     print "Mean score: " avg; 
     print "Min score: " min; 
     print "Max score: " max
-}' exp_009_deep_results.csv
+}' ../experiments/exp_009/exp_009_deep_results.csv
 
 # Max tile distribution
 echo -e "\n=== MAX TILE DISTRIBUTION ==="
-awk -F, 'NR>1 {tiles[$4]++} END {for (t in tiles) print t ": " tiles[t] " (" tiles[t] "%)"}' exp_009_deep_results.csv | sort -n
+awk -F, 'NR>1 {tiles[$4]++} END {for (t in tiles) print t ": " tiles[t] " (" tiles[t] "%)"}' ../experiments/exp_009/exp_009_deep_results.csv | sort -n
 #+end_src
 
 *** Analysis Script
-#+begin_src python :tangle exp_009_analysis.py
+#+begin_src python :tangle exp_009/exp_009_analysis.py
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
 # Load results
-df = pd.read_csv('exp_009_deep_results.csv')
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'exp_009_deep_results.csv'))
 
 # Create figure with subplots
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
@@ -290,7 +290,8 @@ for i, (tile, count) in enumerate(tile_counts.items()):
     ax4.text(i, count + 0.5, f'{count/len(df)*100:.1f}%', ha='center')
 
 plt.tight_layout()
-plt.savefig('exp_009_deep_analysis.png', dpi=150, bbox_inches='tight')
+output_path = os.path.join(os.path.dirname(__file__), 'exp_009_deep_analysis.png')
+plt.savefig(output_path, dpi=150, bbox_inches='tight')
 
 # Print detailed statistics
 print("=== DETAILED STATISTICS ===")
@@ -313,7 +314,7 @@ for tile, count in tile_counts.items():
 #+end_src
 
 *** Gnuplot Visualization
-#+begin_src gnuplot :tangle exp_009_simple.gp
+#+begin_src gnuplot :tangle exp_009/exp_009_simple.gp
 # Simple histogram of scores
 set terminal pngcairo size 800,600 font "Arial,12"
 set output 'exp_009_score_dist.png'
@@ -331,7 +332,7 @@ binwidth = 50
 bin(x,width) = width*floor(x/width) + width/2.0
 set boxwidth binwidth*0.9
 
-plot 'exp_009_deep_results.csv' every ::1 using (bin($2,binwidth)):(1.0) smooth freq with boxes lc rgb "#4472C4" title "Scores"
+plot '../experiments/exp_009/exp_009_deep_results.csv' every ::1 using (bin($2,binwidth)):(1.0) smooth freq with boxes lc rgb "#4472C4" title "Scores"
 #+end_src
 
 *** Deep Run Results

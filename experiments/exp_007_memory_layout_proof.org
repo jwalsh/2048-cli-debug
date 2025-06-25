@@ -107,7 +107,7 @@ This explains ALL our previous confusion about "flipped" boards!
 
 ** VERIFICATION STATISTICS
 *** Reproducibility Test
-#+begin_src bash :tangle scripts/verify_memory_layout.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_007/scripts/verify_memory_layout.sh :shebang #!/bin/bash
 # Run discovery test 10 times to ensure consistency
 echo "=== Memory Layout Verification Test ==="
 
@@ -120,7 +120,7 @@ for i in {1..10}; do
     sleep 0.5
     
     # Start game with known seed (if possible)
-    tmux new-session -d -s verify_$i ~./2048-debug~
+    tmux new-session -d -s verify_$i ~../../2048-cli-0.9.1/2048-debug~
     sleep 1
     
     # Make controlled moves
@@ -166,7 +166,7 @@ Key Discovery: To access UI[r][c], use grid[c][r]!
 #+end_example
 
 ** AUTOMATED TEST SUITE
-#+begin_src python :tangle scripts/test_memory_layout.py
+#+begin_src python :tangle exp_007/scripts/test_memory_layout.py
 #!/usr/bin/env python3
 """Automated verification of the column-major discovery"""
 
@@ -233,7 +233,7 @@ if __name__ == "__main__":
 
 ** PERFORMANCE IMPLICATIONS
 *** Cache Performance Analysis
-#+begin_src c :tangle benchmarks/cache_test.c
+#+begin_src c :tangle exp_007/benchmarks/cache_test.c
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -296,18 +296,18 @@ int main() {
 }
 #+end_src
 
-#+begin_src bash :tangle scripts/run_cache_test.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_007/scripts/run_cache_test.sh :shebang #!/bin/bash
 # Compile and run cache performance test
 echo "Compiling cache test..."
-gcc -O2 -o benchmarks/cache_test benchmarks/cache_test.c
+gcc -O2 -o exp_007/benchmarks/cache_test exp_007/benchmarks/cache_test.c
 
 echo "Running cache performance analysis..."
-./benchmarks/cache_test
+./exp_007/benchmarks/cache_test
 #+end_src
 
 ** RAW DATA ARCHIVE
 *** Discovery Session Memory Dump
-#+begin_src text :tangle data/exp_007_memory_dump.txt
+#+begin_src text :tangle exp_007/data/exp_007_memory_dump.txt
 # Memory dump at moment of discovery
 # LLDB: memory read -f d -c 16 g->grid_data_ptr
 
@@ -327,7 +327,7 @@ echo "Running cache performance analysis..."
 #+end_src
 
 *** Key LLDB Commands Used
-#+begin_src text :tangle data/exp_007_lldb_commands.txt
+#+begin_src text :tangle exp_007/data/exp_007_lldb_commands.txt
 # Commands that led to the discovery
 frame select 7
 p g->grid[0][3]  # Expected 1, got 0
@@ -342,7 +342,7 @@ x/16dw g->grid_data_ptr
 
 ** REPRODUCIBILITY PACKAGE
 *** Environment Configuration
-#+begin_src yaml :tangle .exp007/environment.yaml
+#+begin_src yaml :tangle exp_007/.exp007/environment.yaml
 # Environment for Experiment #007
 experiment:
   id: exp-007-memory-layout-proof
@@ -365,7 +365,7 @@ dependencies:
 #+end_src
 
 *** Automated Reproduction Script
-#+begin_src bash :tangle scripts/reproduce_exp_007.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_007/scripts/reproduce_exp_007.sh :shebang #!/bin/bash
 #!/bin/bash
 # Reproduce the column-major discovery
 
@@ -379,7 +379,7 @@ tmux kill-server 2>/dev/null || true
 
 # 2. Build debug version
 echo "Step 2: Building debug binary..."
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 make clean && make CFLAGS="-g -O0" 2048-debug
 
 # 3. Start game in debugger

@@ -1,7 +1,7 @@
 #+TITLE: Experiment #010: Timing Extrapolation Validation
 #+DATE: [2025-06-25]
 
-[[file:exp_010_validation.png]]
+[[file:exp_010/exp_010_validation.png]]
 
 * EXPERIMENT #010: Validate Timing Extrapolation with Deep Run
 :PROPERTIES:
@@ -28,16 +28,16 @@ We need to validate our timing model before designing larger experiments. If the
 - *Move sequence*: "sdsdsdsds..." pattern (alternating down-right)
 
 *** Run Script
-#+begin_src bash :tangle exp_010_deep_validation.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_010/exp_010_deep_validation.sh :shebang #!/bin/bash
 # Deep validation run: 50 runs with 150 moves each
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Experiment #010: Timing Validation ==="
 echo "Hypothesis: 150 moves = ~27.75s per run"
 echo "Total expected time: ~23 minutes"
 echo ""
 echo "Starting at $(date)"
-echo "run,score,time_s,max_tile,moves_per_second" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_010_results.csv
+echo "run,score,time_s,max_tile,moves_per_second" > ../experiments/exp_010/exp_010_results.csv
 
 # Generate move sequence (150 moves = 75 SD pairs + quit)
 MOVES=""
@@ -65,7 +65,7 @@ for run in {1..50}; do
     MOVES_PER_SEC=$(echo "scale=3; 150 / $TIME_S" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_010_results.csv
+    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> ../experiments/exp_010/exp_010_results.csv
     
     # Progress with timing prediction
     if (( run % 5 == 0 )); then
@@ -85,7 +85,7 @@ echo "Ended at $(date)"
 #+end_src
 
 *** Analysis Script
-#+begin_src python :tangle exp_010_analysis.py
+#+begin_src python :tangle exp_010/exp_010_analysis.py
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -190,9 +190,9 @@ print(f"Timing model consistency: {'✅ Linear' if error < 10 else '❌ Non-line
 #+end_src
 
 *** Quick Sanity Check
-#+begin_src bash :tangle exp_010_quick_test.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_010/exp_010_quick_test.sh :shebang #!/bin/bash
 # Quick test: 3 runs to verify setup before full experiment
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Quick Sanity Check: 3 runs of 150 moves ==="
 MOVES=""

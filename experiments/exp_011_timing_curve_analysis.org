@@ -24,12 +24,12 @@ Understanding the true timing model is crucial for:
 
 ** METHOD
 *** Part 1: Map the Timing Curve
-#+begin_src bash :tangle scripts/exp_011_timing_curve.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_timing_curve.sh :shebang #!/bin/bash
 # Test multiple move counts to map the timing curve
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Timing Curve Analysis ==="
-echo "moves,run,time_s,score,max_tile" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_timing_curve.csv
+echo "moves,run,time_s,score,max_tile" > ../experiments/exp_011/exp_011_timing_curve.csv
 
 # Test points: 10, 20, 40, 60, 80, 100, 120, 150, 200 moves
 MOVE_COUNTS=(10 20 40 60 80 100 120 150 200)
@@ -58,7 +58,7 @@ for MOVES in "${MOVE_COUNTS[@]}"; do
         SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
         MAX_TILE=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | sort -nr | head -1)
         
-        echo "$MOVES,$run,$TIME_S,$SCORE,$MAX_TILE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_timing_curve.csv
+        echo "$MOVES,$run,$TIME_S,$SCORE,$MAX_TILE" >> ../experiments/exp_011/exp_011_timing_curve.csv
         echo "  Run $run: ${TIME_S}s ($(echo "scale=3; $TIME_S / $MOVES * 1000" | bc)ms/move)"
     done
 done
@@ -67,12 +67,12 @@ echo -e "\n=== Curve mapping complete ==="
 #+end_src
 
 *** Part 2: Profile Game Phases
-#+begin_src bash :tangle scripts/exp_011_phase_analysis.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_phase_analysis.sh :shebang #!/bin/bash
 # Analyze timing of different game phases
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Game Phase Analysis ==="
-echo "phase,moves,time_s,tiles_on_board,score" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+echo "phase,moves,time_s,tiles_on_board,score" > ../experiments/exp_011/exp_011_phases.csv
 
 # Function to count tiles in output
 count_tiles() {
@@ -88,7 +88,7 @@ END=$(date +%s.%N)
 TIME_S=$(echo "$END - $START" | bc)
 TILES=$(count_tiles "$OUTPUT")
 SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
-echo "early,20,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+echo "early,20,$TIME_S,$TILES,$SCORE" >> ../experiments/exp_011/exp_011_phases.csv
 
 # Test mid game (moves 21-60)
 echo "Testing mid game..."
@@ -104,7 +104,7 @@ TILES=$(count_tiles "$OUTPUT")
 SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
 # Calculate just the mid-game time
 TOTAL_TIME=$TIME_S
-echo "mid,40,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+echo "mid,40,$TIME_S,$TILES,$SCORE" >> ../experiments/exp_011/exp_011_phases.csv
 
 # Test late game (moves 61-100)
 echo "Testing late game..."
@@ -117,18 +117,18 @@ END=$(date +%s.%N)
 TIME_S=$(echo "$END - $START" | bc)
 TILES=$(count_tiles "$OUTPUT")
 SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
-echo "late,100,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+echo "late,100,$TIME_S,$TILES,$SCORE" >> ../experiments/exp_011/exp_011_phases.csv
 
 echo "=== Phase analysis complete ==="
 #+end_src
 
 *** Part 3: Board Density Impact
-#+begin_src bash :tangle scripts/exp_011_density_test.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_density_test.sh :shebang #!/bin/bash
 # Test if board density affects timing
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Board Density Impact Test ==="
-echo "strategy,density_estimate,moves,time_s,tiles" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+echo "strategy,density_estimate,moves,time_s,tiles" > ../experiments/exp_011/exp_011_density.csv
 
 # Strategy 1: Corner packing (down-left spam) - high density
 echo "Testing corner packing strategy..."
@@ -141,7 +141,7 @@ OUTPUT=$(echo "$CORNER_MOVES" | ./2048-debug 2>&1)
 END=$(date +%s.%N)
 TIME_S=$(echo "$END - $START" | bc)
 TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
-echo "corner,high,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+echo "corner,high,100,$TIME_S,$TILES" >> ../experiments/exp_011/exp_011_density.csv
 
 # Strategy 2: Spread moves (alternating all directions) - low density
 echo "Testing spread strategy..."
@@ -154,7 +154,7 @@ OUTPUT=$(echo "$SPREAD_MOVES" | ./2048-debug 2>&1)
 END=$(date +%s.%N)
 TIME_S=$(echo "$END - $START" | bc)
 TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
-echo "spread,low,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+echo "spread,low,100,$TIME_S,$TILES" >> ../experiments/exp_011/exp_011_density.csv
 
 # Strategy 3: Our standard down-right - medium density
 echo "Testing standard strategy..."
@@ -167,13 +167,13 @@ OUTPUT=$(echo "$STANDARD_MOVES" | ./2048-debug 2>&1)
 END=$(date +%s.%N)
 TIME_S=$(echo "$END - $START" | bc)
 TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
-echo "standard,medium,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+echo "standard,medium,100,$TIME_S,$TILES" >> ../experiments/exp_011/exp_011_density.csv
 
 echo "=== Density test complete ==="
 #+end_src
 
 *** Analysis Script
-#+begin_src python :tangle scripts/exp_011_analysis.py
+#+begin_src python :tangle exp_011/scripts/exp_011_analysis.py
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -354,7 +354,7 @@ print(f"3. True per-move cost after startup: ~{timing_stats.iloc[-1]['ms_per_mov
 - Could be triggered by specific key sequences
 
 *Test approaches*:
-#+begin_src bash :tangle scripts/exp_011_flag_discovery.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_flag_discovery.sh :shebang #!/bin/bash
 # Discover hidden command-line flags
 echo "=== Searching for hidden flags ==="
 

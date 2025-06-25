@@ -55,7 +55,7 @@ The initial mini pilot revealed critical tmux session issues:
 
 ** METHOD
 *** Run Script
-#+begin_src bash :tangle exp_008_runner.sh
+#+begin_src bash :tangle exp_008/exp_008_runner.sh
 #!/bin/bash
 RESULTS_FILE="exp_008_results.csv"
 echo "run,score,max_tile,moves_made,game_over,ui_memory_match" > $RESULTS_FILE
@@ -92,7 +92,7 @@ done
 #+end_src
 
 *** Analysis Script
-#+begin_src python :tangle exp_008_analysis.py
+#+begin_src python :tangle exp_008/exp_008_analysis.py
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -130,14 +130,14 @@ plt.xlabel('Score')
 plt.ylabel('Frequency')
 plt.title('Score Distribution (100 runs, 150 moves each)')
 plt.legend()
-plt.savefig('exp_008_distribution.png')
+plt.savefig('exp_008/exp_008_distribution.png')
 #+end_src
 
 *** Gnuplot Visualization
-#+begin_src gnuplot :tangle exp_008_plot.gnuplot
+#+begin_src gnuplot :tangle exp_008/exp_008_plot.gnuplot
 # 2048 Down-Right Spam Distribution Analysis
 set terminal pngcairo size 1200,800 font "Arial,12"
-set output 'exp_008_gnuplot.png'
+set output 'exp_008/exp_008_gnuplot.png'
 
 # Set up the plot
 set title "Score Distribution: 150-Move Down-Right Spam (100 Runs)" font ",16"
@@ -172,7 +172,7 @@ set label 1 sprintf("Statistics:\nMean: %.1f\nMedian: %.1f\nStd Dev: %.1f\nMin: 
 
 # Second plot: Max tile distribution
 set terminal pngcairo size 800,600 font "Arial,12"
-set output 'exp_008_tiles.png'
+set output 'exp_008/exp_008_tiles.png'
 set title "Max Tile Distribution" font ",16"
 set xlabel "Max Tile Value"
 set ylabel "Count"
@@ -210,11 +210,11 @@ tmux new-session -d -s "pilot_$run" "./2048-debug"
 *** Mini Pilot Script (Fixed)
 After discovering the tmux session failure, we fixed the script with proper paths:
 
-#+begin_src bash :tangle mini_pilot.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_008/mini_pilot.sh :shebang #!/bin/bash
 # Fixed mini pilot: 3 runs with proper tmux handling
 
 # Get the directory where the game is located
-GAME_DIR="/Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1"
+GAME_DIR="../../2048-cli-0.9.1"
 GAME_EXEC="$GAME_DIR/2048-debug"
 
 # Verify game exists
