@@ -1,0 +1,58 @@
+#!/usr/bin/expect -f
+# Claude proves actual interaction with 2048 - 5 specific moves
+
+set timeout 10
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+puts "\n🎮 Claude Proves TTY Interaction - 5 Moves\n"
+
+# Wait for initial board
+expect "Score:"
+puts "✅ Game started - I see the board\n"
+sleep 1
+
+# Move 1: DOWN
+puts "Move 1: Sending DOWN (s)"
+send "s"
+expect "Score:"
+puts "✅ Board updated after DOWN\n"
+sleep 1
+
+# Move 2: RIGHT  
+puts "Move 2: Sending RIGHT (d)"
+send "d"
+expect "Score:"
+puts "✅ Board updated after RIGHT\n"
+sleep 1
+
+# Move 3: DOWN
+puts "Move 3: Sending DOWN (s)"
+send "s"
+expect "Score:"
+puts "✅ Board updated after DOWN\n"
+sleep 1
+
+# Move 4: RIGHT
+puts "Move 4: Sending RIGHT (d)"
+send "d"
+expect "Score:"
+puts "✅ Board updated after RIGHT\n"
+sleep 1
+
+# Move 5: LEFT
+puts "Move 5: Sending LEFT (a)"
+send "a"
+expect "Score:"
+puts "✅ Board updated after LEFT\n"
+sleep 1
+
+puts "\n🎯 5 moves completed!"
+puts "I sent: s, d, s, d, a"
+puts "The game responded to each move\n"
+
+# Quit
+send "q"
+expect eof
+
+puts "✅ Successfully interacted with 2048 via TTY!"

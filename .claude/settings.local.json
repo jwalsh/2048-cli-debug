@@ -11,7 +11,11 @@
       "Bash(uv run:*)",
       "Bash(./claude_actually_plays.sh)",
       "Bash(screen:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(tmux new-session:*)",
+      "Bash(tmux capture-pane:*)",
+      "Bash(tmux send-keys:*)"
     ]
   },
   "enableAllProjectMcpServers": false
