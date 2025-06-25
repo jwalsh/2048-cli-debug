@@ -1,0 +1,20 @@
+-----------------------------
+
+Process 7218 stopped
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+    frame #0: 0x0000000100001e20 2048-debug`gamestate_tick(s=0x0000600002648000,
+ g=0x000060000014c000, d=3, callback=(2048-debug`draw_then_sleep at main.c:8)) a
+t engine.c:276:5
+   273  int gamestate_tick(struct gfx_state *s, struct gamestate *g, int d, void
+ (*callback)(struct gfx_state*, struct gamestate*))
+   274  {
+   275      /* Reset move. Altered by gravitate and merge if we do move */
+-> 276      g->moved = 0;
+   277      gravitate(s, g, d, callback);
+   278      merge(s, g, d, callback);
+   279      gravitate(s, g, d, callback);
+(lldb) print g->score
+(long) 376
+(lldb) print g->blocks_in_play
+(int) 9
+(lldb)

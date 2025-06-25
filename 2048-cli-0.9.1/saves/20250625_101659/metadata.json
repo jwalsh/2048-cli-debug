@@ -1,0 +1,11 @@
+{
+  "timestamp": "20250625_101659",
+  "save_dir": "saves/20250625_101659",
+  "files": {
+    "gamestate": "gamestate.bin",
+    "grid": "grid.bin",
+    "core": "core.dump",
+    "display": "display.txt",
+    "analysis": "analysis.txt"
+  }
+}

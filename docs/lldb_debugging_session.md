@@ -331,4 +331,53 @@ We successfully demonstrated LLDB's ability to save and restore game state:
 
 This enables save-states, replay systems, and state sharing - all through the debugger without modifying game code!
 
+## Challenges Encountered & Solutions
+
+### 1. Command Concatenation Issue
+**Problem**: When sending rapid commands to LLDB via tmux, moves got concatenated:
+```
+(lldb) scontinue  # 's' + 'continue' merged
+error: 'scontinue' is not a valid command.
+```
+
+**Solution**: Added proper delays between commands and created workflow script with timing:
+```bash
+tmux send-keys -t lldb2048 "s"
+sleep 0.2  # Critical delay
+tmux send-keys -t lldb2048 "continue" Enter
+sleep 0.3  # Wait for execution
+```
+
+### 2. Board Display Capture
+**Problem**: Game display not always visible in tmux capture due to LLDB output
+**Solution**: Multiple capture strategies with fallbacks:
+```bash
+tmux capture-pane | grep -B 2 -A 10 "Score:" || \
+tmux capture-pane | tail -20
+```
+
+### 3. Memory Layout Discovery
+**Problem**: Grid stored column-major, not row-major as initially assumed
+**Solution**: Adjusted array indexing in analysis scripts:
+```python
+idx = col * 4 + row  # Column-major, not row * 4 + col
+```
+
+### 4. Persistent Workflow Automation
+**Problem**: Manual save/analyze steps were error-prone
+**Solution**: Created `save_analyze_workflow.sh` to automate entire process
+
+### 5. Binary Data Interpretation
+**Problem**: Raw memory dumps hard to interpret
+**Solution**: Multiple output formats + Python decoder + hexdump integration
+
+### Key Learnings for Debugger Workflows
+1. **Timing is critical** - Commands need proper delays to avoid concatenation
+2. **Multiple capture methods** - Always have fallback strategies
+3. **Automate repetitive tasks** - Reduces errors and improves consistency
+4. **Save multiple formats** - Binary for restoration, text for analysis
+5. **Document assumptions** - Memory layout wasn't what we expected
+
+These challenges demonstrate the complexity of real-world debugger integration and the importance of robust tooling for LLM-driven debugging workflows.
+
 Next steps: Implement Python-based LLDB automation for programmatic game control as outlined in issue #6.

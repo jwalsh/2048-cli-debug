@@ -1,0 +1,20 @@
+error: 'scontinue' is not a valid command.
+(lldb) dcontinue
+error: 'dcontinue' is not a valid command.
+(lldb) scontinue
+error: 'scontinue' is not a valid command.
+(lldb) dcontinue
+error: 'dcontinue' is not a valid command.
+(lldb) scontinue
+error: 'scontinue' is not a valid command.
+(lldb) dcontinue
+error: 'dcontinue' is not a valid command.
+(lldb) scontinue
+error: 'scontinue' is not a valid command.
+(lldb) dcontinue
+error: 'dcontinue' is not a valid command.
+(lldb) print g->score
+(long) 376
+(lldb) print g->blocks_in_play
+(int) 9
+(lldb)

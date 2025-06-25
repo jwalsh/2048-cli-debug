@@ -1,0 +1,24 @@
+Saving 16384 bytes of data for memory region at 0x1f7500000
+Saving 16384 bytes of data for memory region at 0x1f7504000
+Saving 98304 bytes of data for memory region at 0x1f7750000
+Saving 16384 bytes of data for memory region at 0x1f7778000
+Saving 16384 bytes of data for memory region at 0x1f7be0000
+Saving 16384 bytes of data for memory region at 0x26d490000
+Saving 16384 bytes of data for memory region at 0x2ad770000
+Saving 32768 bytes of data for memory region at 0x600000148000
+Saving 32768 bytes of data for memory region at 0x600001448000
+Saving 32768 bytes of data for memory region at 0x600001648000
+Saving 32768 bytes of data for memory region at 0x600001a48000
+Saving 16384 bytes of data for memory region at 0x600002348000
+Saving 32768 bytes of data for memory region at 0x600002548000
+Saving 16384 bytes of data for memory region at 0x600002648000
+Saving 16384 bytes of data for memory region at 0x600002b48000
+Saving 32768 bytes of data for memory region at 0x600003048000
+Saving 16384 bytes of data for memory region at 0x600003748000
+Saving 32768 bytes of data for memory region at 0x600003a48000
+
+Modified-memory or stack-memory only corefile created.  This corefile may
+not show library/framework/app binaries on a different system, or when
+those binaries have been updated/modified. Copies are not included
+in this corefile.  Use --style full to include all process memory.
+(lldb)

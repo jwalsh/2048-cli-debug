@@ -1,0 +1,3 @@
+Highest tile: 64
+Empty cells: 7
+Board hash: 4854484353314257829
