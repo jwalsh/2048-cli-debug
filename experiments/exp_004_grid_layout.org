@@ -1,0 +1,108 @@
+#+TITLE: Experiment #004: Grid Layout Interpretation
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #004: Grid Layout Interpretation
+:PROPERTIES:
+:ID: exp-004-grid-layout
+:CONTEXT: [[id:exp-003-lldb-memory][Memory inspection working]]
+:ISSUE: Board appears "flipped" after down-right spam
+:END:
+
+** HYPOTHESIS
+Grid is stored in column-major order (like Fortran).
+
+** RATIONALE
+After running down-right spam, the high-value tiles appeared in unexpected positions when interpreting memory as row-major. This suggests the game might use column-major storage.
+
+** METHOD
+*** Grid Decoding Script
+#+begin_src python :tangle exp_004/exp_004_decode.py :mkdirp yes :results output
+def decode_grid(values, method="column-major"):
+    print(f"=== {method.upper()} ===")
+    for row in range(4):
+        row_str = "|"
+        for col in range(4):
+            if method == "column-major":
+                idx = col * 4 + row
+            else:  # row-major
+                idx = row * 4 + col
+            val = values[idx]
+            tile = (2 ** val) if val > 0 else 0
+            row_str += f"{str(tile):>5} |"
+        print(row_str)
+
+# Test with actual memory dump
+values = [3,1,3,1, 0,3,4,3, 0,1,0,6, 0,0,0,2]
+decode_grid(values, "column-major")
+print()
+decode_grid(values, "row-major")
+#+end_src
+
+*** Memory Dump from Down-Right Spam
+#+begin_src text :tangle exp_004/memory_dump.txt :mkdirp yes
+Memory values after ~200 down-right moves:
+[3,1,3,1, 0,3,4,3, 0,1,0,6, 0,0,0,2]
+
+Which represents:
+3 = 8 (2^3)
+1 = 2 (2^1)
+4 = 16 (2^4)
+6 = 64 (2^6)
+#+end_src
+
+** OBSERVATIONS
+*** Column-Major Interpretation
+#+begin_example
+=== COLUMN-MAJOR ===
+|    8 |    0 |    0 |    0 |
+|    2 |    8 |    2 |    0 |
+|    8 |   16 |    0 |    0 |
+|    2 |    8 |   64 |    4 |
+#+end_example
+
+*** Row-Major Interpretation
+#+begin_example
+=== ROW-MAJOR ===
+|    8 |    2 |    8 |    2 |
+|    0 |    8 |   16 |    8 |
+|    0 |    2 |    0 |   64 |
+|    0 |    0 |    0 |    4 |
+#+end_example
+
+*** Analysis
+- User observation: "if we're spamming down and right that the board looks 'flipped'"
+- Row-major shows 64 tile in position [2][3] (bottom-right area) ✅
+- Column-major shows 64 in position [3][2] (looks wrong) ❌
+- Row-major shows clear gradient toward bottom-right corner
+
+** RESULTS
+The row-major interpretation correctly shows:
+1. Highest tile (64) near bottom-right
+2. Empty cells in top-left
+3. Clear accumulation pattern from down-right spam
+4. Tiles building up as expected
+
+** CONCLUSION
+❌ Initial hypothesis WRONG. Grid uses standard C row-major layout.
+
+The confusion arose from misinterpreting the visual pattern. The grid is stored exactly as expected in C:
+- ~grid[0][0]~ = top-left
+- ~grid[3][3]~ = bottom-right
+- Memory layout: row 0, row 1, row 2, row 3
+
+** LESSONS LEARNED
+1. Don't overthink - C uses row-major by default
+2. Verify interpretations with known patterns
+3. Down-right spam creates predictable tile distributions
+4. Trust the standard conventions first
+
+** IMPACT
+This correction affects all future memory reading experiments. We now know:
+- Memory offset = ~row * 4 + col~
+- Direct indexing works as expected
+- No special transformations needed
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: Initial memory discovery
+- [[file:exp_005_ui_memory_alignment.org][Experiment #005]]: UI vs memory verification
+- [[file:exp_007_memory_layout_proof.org][Experiment #007]]: Definitive proof of layout

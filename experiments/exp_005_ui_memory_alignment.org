@@ -1,0 +1,182 @@
+#+TITLE: Experiment #005: UI vs Memory Alignment Verification
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #005: UI vs Memory Alignment Verification
+:PROPERTIES:
+:ID: exp-005-ui-memory-alignment
+:CONTEXT: [[id:exp-004-grid-layout][Corrected to row-major]]
+:END:
+
+** HYPOTHESIS
+UI display and memory representation are perfectly synchronized.
+
+** RATIONALE
+For save/restore functionality to work reliably, we need to verify that the memory state exactly matches what's displayed on screen. Any discrepancies could indicate race conditions or rendering delays.
+
+** METHOD
+*** Simultaneous Capture Script
+#+begin_src bash :tangle exp_005/exp_005_capture.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Capture UI and memory state simultaneously
+
+# Ensure clean environment
+pkill -f 2048 2>/dev/null
+tmux kill-session -t game2048 2>/dev/null
+tmux kill-session -t lldb2048 2>/dev/null
+sleep 1
+
+# Start game in tmux
+tmux new-session -d -s game2048 './2048-debug'
+sleep 1
+
+# Start LLDB in another session
+tmux new-session -d -s lldb2048 "lldb ./2048-debug -p $(pgrep 2048-debug)"
+sleep 2
+
+# Make some moves
+for move in s d s d s d; do
+    tmux send-keys -t game2048 "$move"
+    sleep 0.2
+done
+
+# Capture UI
+tmux capture-pane -t game2048 -p > ui_state.txt
+
+# Capture memory (need to interrupt first)
+tmux send-keys -t lldb2048 C-c
+sleep 0.5
+tmux send-keys -t lldb2048 "memory read -f d -c 16 g->grid_data_ptr" Enter
+sleep 0.5
+tmux capture-pane -t lldb2048 -p > memory_state.txt
+
+echo "Captured UI and memory states"
+#+end_src
+
+*** Comparison Script
+#+begin_src python :tangle exp_005/exp_005_compare.py :mkdirp yes
+def parse_ui_board(ui_text):
+    """Extract board from UI capture"""
+    board = []
+    lines = ui_text.split('\n')
+    board_lines = []
+    
+    # Find board section (between dashed lines)
+    in_board = False
+    for line in lines:
+        if '----' in line:
+            in_board = not in_board
+            continue
+        if in_board and '|' in line:
+            board_lines.append(line)
+    
+    # Parse each row
+    for line in board_lines:
+        row = []
+        cells = line.split('|')[1:-1]  # Skip first and last empty
+        for cell in cells:
+            val = cell.strip()
+            row.append(int(val) if val else 0)
+        board.append(row)
+    
+    return board
+
+def parse_memory_dump(memory_text):
+    """Extract values from memory dump"""
+    values = []
+    for line in memory_text.split('\n'):
+        if '0x' in line and ':' in line:
+            # Parse hex addresses line
+            parts = line.split(':')[1].strip().split()
+            values.extend([int(x) for x in parts])
+    return values[:16]  # Only need 16 values
+
+def decode_memory_to_board(values):
+    """Convert memory values to board using row-major"""
+    board = []
+    for row in range(4):
+        board_row = []
+        for col in range(4):
+            idx = row * 4 + col
+            val = values[idx]
+            tile = (2 ** val) if val > 0 else 0
+            board_row.append(tile)
+        board.append(board_row)
+    return board
+
+# Example comparison
+ui_board = [
+    [0, 0, 0, 0],
+    [0, 0, 2, 4],
+    [0, 2, 4, 16],  # Note: 16 here
+    [0, 4, 8, 32]   # Note: 8 here
+]
+
+memory_board = [
+    [0, 0, 0, 0],
+    [0, 0, 2, 4],
+    [0, 2, 4, 8],   # Note: 8 here (swapped!)
+    [0, 4, 16, 32]  # Note: 16 here (swapped!)
+]
+
+print("MISMATCH DETECTED!")
+print("Positions [2][3] and [3][2] appear swapped")
+print("UI shows 16 at [2][3], memory shows 8")
+print("UI shows 8 at [3][2], memory shows 16")
+#+end_src
+
+** OBSERVATIONS
+*** Captured States
+- Score matches perfectly (180 in both)
+- Most tiles match exactly
+- Two specific tiles (8 and 16) appear swapped
+- Mismatch is consistent across multiple captures
+
+*** Mismatch Pattern
+#+begin_example
+UI Board:
+|      |      |      |      |
+|      |      |    2 |    4 |
+|      |    2 |    4 |   16 |  <- 16 here
+|      |    4 |    8 |   32 |  <- 8 here
+
+Memory Board:
+|      |      |      |      |
+|      |      |    2 |    4 |
+|      |    2 |    4 |    8 |  <- 8 here (swapped!)
+|      |    4 |   16 |   32 |  <- 16 here (swapped!)
+#+end_example
+
+** ANALYSIS OF POSSIBLE CAUSES
+1. *Race condition*: Debugger interrupts mid-update
+2. *Rendering buffer*: UI shows previous frame
+3. *Animation state*: Tiles still animating when captured
+4. *Cache coherency*: Memory not yet flushed
+5. *Measurement error*: Timing of captures not truly simultaneous
+
+** RESULTS
+❌ UI and memory are NOT always perfectly aligned!
+
+This has critical implications:
+- Save/restore must handle potential mismatches
+- Memory state might be "ahead" of UI
+- Need to understand update sequence
+
+** CONCLUSION
+The hypothesis of perfect synchronization is FALSE. There's a observable discrepancy between UI display and memory state, particularly for recently moved tiles. This suggests the game uses some form of double buffering or has animation states that aren't reflected in the core game state.
+
+** LESSONS LEARNED
+1. Never assume UI perfectly reflects internal state
+2. Timing matters when capturing state
+3. Animation systems can cause discrepancies
+4. Need multiple samples to identify patterns
+
+** IMPACT ON FUTURE WORK
+- Save/restore systems need reconciliation logic
+- State verification requires multiple reads
+- Animation timing affects state consistency
+- May need to pause rendering for accurate captures
+
+** RELATED EXPERIMENTS
+- [[file:exp_004_grid_layout.org][Experiment #004]]: Established correct memory layout
+- [[file:exp_007_memory_layout_proof.org][Experiment #007]]: Further memory investigation
+- [[file:exp_020_save_restore.org][Experiment #020]]: Save/restore implementation

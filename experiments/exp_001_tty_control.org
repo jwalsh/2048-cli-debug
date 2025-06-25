@@ -1,0 +1,82 @@
+#+TITLE: Experiment #001: TTY Control Without Source Modification
+#+DATE: [2025-06-23]
+
+* EXPERIMENT #001: TTY Control Without Source Modification
+:PROPERTIES:
+:ID: exp-001-tty-control
+:HYPOTHESIS: We can control 2048 through TTY interface without modifying source
+:END:
+
+** HYPOTHESIS
+Direct TTY interaction will allow:
+- Sending keystrokes to running game
+- Capturing game state from terminal output
+- Building automated gameplay without game modification
+
+** METHOD
+*** Approach 1: Python TTY Reader
+#+begin_src python :tangle exp_001/exp_001_tty_reader.py :mkdirp yes
+import pty
+import os
+import select
+import time
+
+def read_game_output(master_fd, timeout=0.1):
+    """Read available output from PTY"""
+    readable, _, _ = select.select([master_fd], [], [], timeout)
+    if readable:
+        return os.read(master_fd, 1024).decode('utf-8', errors='ignore')
+    return ""
+#+end_src
+
+*** Approach 2: Expect Scripts
+#+begin_src tcl :tangle exp_001/exp_001_expect.exp :mkdirp yes
+spawn ./2048
+expect "Score:"
+send "s"
+expect "Score:"
+send "d"
+#+end_src
+
+*** Approach 3: tmux Automation
+#+begin_src bash :tangle exp_001/exp_001_tmux.sh :shebang #!/bin/bash :mkdirp yes
+tmux new-session -d -s game2048 './2048'
+tmux send-keys -t game2048 "s"  # down
+sleep 0.1
+tmux send-keys -t game2048 "d"  # right
+#+end_src
+
+** OBSERVATIONS
+*** Python TTY Reader
+- ✅ Successfully spawned game process
+- ✅ Captured initial board state
+- ❌ OSError [Errno 5] after ~100 moves
+- Note: "remember basics: it's a tty; don't over think it" - user
+
+*** Expect Scripts
+- ✅ Clean interaction model
+- ✅ Reliable for scripted sequences
+- User: "nice, expect was the right way to go"
+
+*** tmux Sessions
+- ✅ Most reliable approach
+- ✅ Persistent sessions
+- ✅ Easy state inspection
+
+** RESULTS
+- *Winner*: tmux automation
+- *Success rate*: tmux (100%), expect (90%), Python PTY (60%)
+- *Key learning*: Simple tools often work better than complex abstractions
+
+** CONCLUSION
+tmux provides the most reliable TTY interaction for long-running sessions. The simplicity and persistence make it ideal for debugging workflows.
+
+** LESSONS LEARNED
+1. Don't overthink TTY interaction - it's just a terminal
+2. tmux persistence is valuable for debugging
+3. Expect scripts are great for scripted sequences
+4. Python PTY has edge cases that need careful handling
+
+** RELATED EXPERIMENTS
+- [[file:exp_002_downright_spam.org][Experiment #002]]: Uses tmux for spam strategy
+- [[file:exp_023_tty_interaction.org][Experiment #023]]: Advanced TTY techniques

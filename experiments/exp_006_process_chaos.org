@@ -1,0 +1,138 @@
+#+TITLE: Experiment #006: Process Management Chaos
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #006: Process Management Chaos
+:PROPERTIES:
+:ID: exp-006-process-chaos
+:TAGS: failure learning
+:END:
+
+** HYPOTHESIS
+We can cleanly manage multiple debugging sessions.
+
+** METHOD
+"Just attach to the running game" 
+
+** WHAT ACTUALLY HAPPENED
+*** The Zombie Apocalypse
+#+begin_example
+jasonwalsh  7218  99.7  0.0  2048-debug  (running for 2+ hours)
+jasonwalsh 21821  0.0   0.0  2048-debug  (new process)
+jasonwalsh  2928  99.4  0.0  2048        (3+ hours!)
+jasonwalsh 44541  98.6  0.0  2048        (since yesterday!)
+#+end_example
+
+*** The Comedy of Errors
+1. Started debugging session yesterday, forgot about it
+2. Started new session today, didn't check for existing processes
+3. Attached LLDB to zombie process from hours ago
+4. Created game in one tmux window, tried to debug different instance
+5. Commands concatenated: typed "scontinue" instead of "s" then "continue"
+6. Multiple 2048 processes consuming 99% CPU in background
+
+*** What Went Wrong (Everything)
+- No process hygiene
+- Didn't verify PID before attaching
+- Lost track of tmux sessions
+- Zombie processes accumulating
+- Commands running together without delays
+
+** OBSERVATIONS
+*** CPU Usage
+- 4 instances of 2048 running simultaneously
+- Total CPU usage: ~400%
+- Mac fan spinning like a jet engine
+- System becoming unresponsive
+
+*** tmux Session Chaos
+#+begin_example
+$ tmux ls
+game2048: 1 windows (created Tue Jun 25 10:15:22 2024)
+lldb2048: 1 windows (created Tue Jun 25 10:16:45 2024)
+debug1: 1 windows (created Mon Jun 24 18:22:13 2024)
+test: 1 windows (created Mon Jun 24 14:11:02 2024)
+old_game: 1 windows (created Sun Jun 23 22:45:33 2024)
+#+end_example
+
+*** Debug Session Confusion
+- Attached to PID 7218 (2+ hour old process)
+- Game actually running as PID 21821
+- LLDB commands going to wrong process
+- No visible effect from commands
+
+** RESULTS
+Complete chaos and system near-meltdown.
+
+** LESSONS LEARNED
+1. *Always clean before starting*:
+   #+begin_src bash
+   pkill -f 2048
+   tmux kill-server
+   #+end_src
+
+2. *Name sessions clearly*:
+   #+begin_src bash
+   tmux new-session -d -s "game_exp006_$(date +%H%M)"
+   #+end_src
+
+3. *Verify PID before attaching*:
+   #+begin_src bash
+   pgrep -l 2048
+   ps aux | grep 2048 | grep -v grep
+   #+end_src
+
+4. *Add delays between commands*:
+   - Minimum 0.2s between commands
+   - 0.5s after process commands
+   - 1.0s after starting processes
+
+5. *Monitor system resources*:
+   #+begin_src bash
+   top -o cpu | grep 2048
+   #+end_src
+
+** CONCLUSION
+"lol, such is testing :D" - user
+
+Process hygiene is critical for reliable debugging sessions. What seems like a simple task (attach debugger to game) can spiral into chaos without proper process management.
+
+** RECOVERY PROCEDURE
+#+begin_src bash :tangle exp_006/cleanup.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+echo "=== Emergency 2048 Cleanup ==="
+
+# Kill all 2048 processes
+echo "Killing all 2048 processes..."
+pkill -f 2048
+sleep 1
+
+# Force kill if needed
+if pgrep 2048 > /dev/null; then
+    echo "Force killing stubborn processes..."
+    pkill -9 -f 2048
+fi
+
+# Clean up tmux
+echo "Cleaning tmux sessions..."
+tmux list-sessions 2>/dev/null | grep -E "(game|lldb|debug)" | cut -d: -f1 | xargs -I {} tmux kill-session -t {}
+
+# Verify cleanup
+echo -e "\nRemaining 2048 processes:"
+ps aux | grep 2048 | grep -v grep || echo "None found!"
+
+echo -e "\nRemaining tmux sessions:"
+tmux list-sessions 2>/dev/null || echo "No sessions!"
+
+echo -e "\nCleanup complete!"
+#+end_src
+
+** BEST PRACTICES ESTABLISHED
+1. One game instance at a time
+2. Clear session naming convention
+3. Process verification before operations
+4. Regular cleanup between experiments
+5. Document PIDs and session names
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: Proper LLDB attachment
+- [[file:exp_017_lldb_controller.org][Experiment #017]]: Automated process management

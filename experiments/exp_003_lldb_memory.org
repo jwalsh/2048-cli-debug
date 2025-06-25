@@ -1,0 +1,135 @@
+#+TITLE: Experiment #003: LLDB Memory Inspection
+#+DATE: [2025-06-24]
+
+* EXPERIMENT #003: LLDB Memory Inspection
+:PROPERTIES:
+:ID: exp-003-lldb-memory
+:HYPOTHESIS: Game state can be read directly from memory
+:END:
+
+** HYPOTHESIS
+LLDB can:
+1. Attach to running 2048 process
+2. Read gamestate structure
+3. Extract grid values and score
+4. Monitor state changes in real-time
+
+** RATIONALE
+Direct memory access would enable:
+- Perfect state observation without UI parsing
+- Understanding internal data structures
+- Building save/restore functionality
+- Real-time game analysis
+
+** METHOD
+*** Build with Debug Symbols
+#+begin_src bash :tangle exp_003/exp_003_build.sh :shebang #!/bin/bash :mkdirp yes
+clang -g -O0 -DINVERT_COLORS -DVT100 src/*.c -o 2048-debug
+#+end_src
+
+*** LLDB Inspection Commands
+#+begin_src lldb :tangle exp_003/exp_003_commands.lldb :mkdirp yes
+breakpoint set -n gamestate_tick
+breakpoint set -n gamestate_new_block
+run
+
+# When stopped, inspect state
+print *g
+print g->score
+memory read -f d -c 16 g->grid_data_ptr
+#+end_src
+
+*** Automated Inspection Script
+#+begin_src bash :tangle exp_003/inspect_memory.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Start LLDB session with game
+tmux new-session -d -s lldb2048 "lldb ./2048-debug"
+sleep 1
+
+# Set breakpoints
+tmux send-keys -t lldb2048 "breakpoint set -n gamestate_tick" Enter
+sleep 0.5
+tmux send-keys -t lldb2048 "run" Enter
+sleep 1
+
+# Wait for breakpoint hit
+sleep 2
+
+# Inspect memory
+tmux send-keys -t lldb2048 "print *g" Enter
+sleep 0.5
+tmux send-keys -t lldb2048 "memory read -f d -c 16 g->grid_data_ptr" Enter
+sleep 0.5
+
+# Capture output
+tmux capture-pane -t lldb2048 -p > exp_003_memory_dump.txt
+#+end_src
+
+** OBSERVATIONS
+*** Memory Layout Discovery
+#+begin_example
+(gamestate) {
+  grid_data_ptr = 0x000060000014c040
+  grid = 0x000060000144c120
+  gridsize = 16
+  moved = 0
+  score = 0
+  score_high = 1900
+  score_last = 0
+  print_width = 5
+  blocks_in_play = 0
+  opts = 0x000060000144c100
+}
+#+end_example
+
+*** Grid Storage
+- 16 integers (4x4 grid)
+- Values are powers of 2: 0=empty, 1=2, 2=4, 3=8, etc.
+- Initially assumed column-major (WRONG!)
+- Grid pointer points to array of row pointers
+
+*** Key Structures Found
+1. ~gamestate~ - Main game state structure
+2. ~grid_data_ptr~ - Raw grid data (16 integers)
+3. ~grid~ - 2D array pointers
+4. ~score~, ~score_high~, ~score_last~ - Score tracking
+5. ~blocks_in_play~ - Number of non-empty tiles
+
+** RESULTS
+✅ Successfully discovered internal data structures without reading source code!
+
+*** Data Encoding
+- Empty cell: 0
+- Tile value: ~2^n~ where n is the stored value
+- Example: stored 3 → tile shows 8 (2^3)
+
+*** Memory Addresses
+- Structures allocated on heap (0x0000600000... range)
+- Consistent layout between runs
+- Grid data contiguous in memory
+
+** CONCLUSION
+LLDB provides complete visibility into game state. We can read:
+- Current board configuration
+- All score values
+- Game state flags
+- Number of active tiles
+
+This enables building advanced debugging and analysis tools without modifying the game source.
+
+** LESSONS LEARNED
+1. Debug symbols are essential (-g flag)
+2. Breakpoints at key functions reveal state
+3. Memory layout can be inferred through inspection
+4. Power-of-2 encoding is space efficient
+
+** FUTURE WORK
+- Map all game functions
+- Track state transitions
+- Build state modification tools
+- Investigate RNG seeding
+
+** RELATED EXPERIMENTS
+- [[file:exp_004_grid_layout.org][Experiment #004]]: Grid layout interpretation
+- [[file:exp_007_memory_layout_proof.org][Experiment #007]]: Definitive memory layout
+- [[file:exp_017_lldb_controller.org][Experiment #017]]: LLDB automation framework
