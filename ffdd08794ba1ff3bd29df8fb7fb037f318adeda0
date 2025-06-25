@@ -1,0 +1,20 @@
+Summary: Successfully learned TTY control through expect\!
+
+Starting point: 'Create TTY-based controller to play 2048'
+Ending point: Working expect scripts that can spam and play strategically
+
+Key achievements:
+- Discovered expect as the right tool (after many failures)
+- Created working scripts that maintain TTY session
+- Reached 736 score with 64 tile (but no 2048 tile yet\!)
+- Documented everything in CLAUDE.md for future sessions
+
+The real victory: We can now control running programs through their TTY interface\!
+Next: Apply this learning to other programs, eventually GDB/LLDB
+
+User wisdom throughout:
+- 'the goal is maybe 2000? i don't really care since you running an interactive program is the goal'
+- 'remember basics: it's a tty; don't over think it'
+- 'remember to keep committing'
+
+And yes, the irony: We never made a 2048 tile in 2048\! 😅
