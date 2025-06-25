@@ -1,0 +1,173 @@
+#!/usr/bin/expect -f
+# Claude aims for 2000 score using expect/TTY control
+# Improved difficulty detection and strategic play
+
+set timeout 60
+set spam_moves 0
+set score 0
+set high_score 0
+set consecutive_no_change 0
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+puts "\n🎮 Claude Aims for 2000 - Pure Expect/TTY Control\n"
+
+# Wait for initial board
+expect "Score:"
+sleep 0.5
+
+puts "📍 Phase 1: AGGRESSIVE SPAM\n"
+
+# More aggressive spam to build higher tiles
+while {$spam_moves < 800} {
+    # Heavier down-right bias for better building
+    set r [expr {rand()}]
+    if {$r < 0.5} {
+        send "s"  ;# 50% down
+    } elseif {$r < 0.8} {
+        send "d"  ;# 30% right
+    } elseif {$r < 0.9} {
+        send "a"  ;# 10% left
+    } else {
+        send "w"  ;# 10% up
+    }
+    after 20
+    incr spam_moves
+    
+    # Check every 50 moves
+    if {$spam_moves % 50 == 0} {
+        expect -re "Score: (\[0-9\]+)" {
+            set score $expect_out(1,string)
+        }
+        
+        # Better difficulty detection - look for high tiles
+        if {[regexp {128|256|512|1024|2048} $expect_out(buffer)]} {
+            puts "\n🎯 HIGH TILES DETECTED! Score: $score after $spam_moves moves"
+            break
+        }
+        
+        if {$spam_moves % 100 == 0} {
+            puts "   Spam $spam_moves moves, score: $score"
+        }
+    }
+    
+    # Also break if score gets high
+    if {$score > 500} {
+        puts "\n📈 Score > 500! Time for strategy"
+        break
+    }
+}
+
+puts "\n📍 Phase 2: CLAUDE STRATEGIC CONTROL\n"
+sleep 1
+
+# Get fresh board state
+send ""
+expect "Score:"
+
+puts "🧠 Claude analyzing board state...\n"
+
+# Strategic play with pattern recognition
+set strategic_moves 0
+set last_score $score
+set stuck_count 0
+
+while {$strategic_moves < 500 && $score < 2000} {
+    
+    # Adaptive strategy based on score
+    if {$score < 500} {
+        # Early game - aggressive building
+        set weights {0.5 0.3 0.1 0.1}  ;# down right left up
+    } elseif {$score < 1000} {
+        # Mid game - more careful
+        set weights {0.4 0.4 0.15 0.05}
+    } else {
+        # Late game - very careful
+        set weights {0.35 0.35 0.25 0.05}
+    }
+    
+    # Make weighted decision
+    set r [expr {rand()}]
+    if {$r < [lindex $weights 0]} {
+        set move "s"
+        set move_name "DOWN"
+    } elseif {$r < [expr {[lindex $weights 0] + [lindex $weights 1]}]} {
+        set move "d"
+        set move_name "RIGHT"
+    } elseif {$r < [expr {[lindex $weights 0] + [lindex $weights 1] + [lindex $weights 2]}]} {
+        set move "a"
+        set move_name "LEFT"
+    } else {
+        set move "w"
+        set move_name "UP"
+    }
+    
+    # If stuck, try recovery sequence
+    if {$stuck_count > 3} {
+        puts "   🔄 Recovery sequence!"
+        send "wasd"
+        after 400
+        set stuck_count 0
+    } else {
+        send $move
+        after 150
+    }
+    
+    incr strategic_moves
+    
+    # Check progress every 5 moves
+    if {$strategic_moves % 5 == 0} {
+        expect -re "Score: (\[0-9\]+)" {
+            set new_score $expect_out(1,string)
+            
+            if {$new_score > $last_score} {
+                puts "Move $strategic_moves: $move_name → Score: $new_score (+[expr {$new_score - $last_score}])"
+                set last_score $new_score
+                set score $new_score
+                set stuck_count 0
+            } else {
+                incr stuck_count
+            }
+        }
+        
+        # Check for high tiles
+        if {[regexp {512|1024|2048} $expect_out(buffer)]} {
+            puts "   ⭐ High tile detected!"
+        }
+    }
+    
+    # Victory checks
+    if {$score >= 2000} {
+        puts "\n🎉🎉🎉 REACHED 2000! Score: $score"
+        break
+    }
+    
+    if {$score >= 1708} {
+        puts "\n🏆 Beat high score of 1708! Current: $score"
+    }
+}
+
+puts "\n📊 Final Statistics:"
+puts "   Total moves: [expr {$spam_moves + $strategic_moves}]"
+puts "   Spam phase: $spam_moves moves"
+puts "   Strategic phase: $strategic_moves moves"
+puts "   Final score: $score"
+
+if {$score >= 2000} {
+    puts "\n🎊 SUCCESS! Reached the 2000 goal!"
+} elseif {$score >= 1708} {
+    puts "\n🥈 Beat the previous high score!"
+} else {
+    puts "\n📈 Progress made: $score/2000"
+}
+
+# Show final board state
+expect "Score:"
+puts "\nFinal board state captured"
+
+# Quit
+send "q"
+expect eof
+
+puts "\n✅ Session complete!"
+puts "Remember: It's about the journey, not the score! 🎮"
