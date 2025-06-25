@@ -14,6 +14,10 @@ Based on Experiment #010's surprising result (0.141s/move for 150 moves vs 0.162
 3. Board saturation (more tiles) leads to faster move processing
 4. Early game has more animation/calculation overhead
 5. The timing will plateau after ~100 moves
+6. *Board locking effect*: With down-right spam, many boards reach states where S-D-S produces no changes
+   - The game still processes these "no-op" moves
+   - These locked moves may process faster (no tile movement/spawning)
+   - This could explain faster per-move timing at higher move counts
 
 ** RATIONALE
 Understanding the true timing model is crucial for:
@@ -172,6 +176,100 @@ echo "standard,medium,100,$TIME_S,$TILES" >> ../experiments/exp_011/exp_011_dens
 echo "=== Density test complete ==="
 #+end_src
 
+*** Part 4: Board Locking Detection
+#+begin_src bash :tangle exp_011/scripts/exp_011_lock_detection.sh :shebang #!/bin/bash :mkdirp yes
+# Detect when boards become "locked" with down-right spam
+cd ../../2048-cli-0.9.1
+
+echo "=== Board Locking Detection Test ==="
+echo "run,total_moves,locked_at_move,final_score,time_s" > ../experiments/exp_011/exp_011_lock_detection.csv
+
+# Function to detect if board is locked
+detect_lock() {
+    local moves="$1"
+    local session="$2"
+    
+    # Start game
+    tmux new-session -d -s "$session" "./2048-debug"
+    sleep 1
+    
+    # Track board states
+    local prev_state=""
+    local curr_state=""
+    local no_change_count=0
+    local move_count=0
+    local locked_at=0
+    
+    START=$(date +%s.%N)
+    
+    for ((i=1; i<=moves; i++)); do
+        # Make a move (alternating S and D)
+        if (( i % 2 == 1 )); then
+            tmux send-keys -t "$session" "s"
+        else
+            tmux send-keys -t "$session" "d"
+        fi
+        sleep 0.05
+        
+        # Capture board state every 3 moves
+        if (( i % 3 == 0 )); then
+            curr_state=$(tmux capture-pane -t "$session" -p | grep -E "^\\|" | tr -d ' ')
+            
+            if [ "$curr_state" = "$prev_state" ]; then
+                ((no_change_count++))
+                if [ $no_change_count -eq 1 ] && [ $locked_at -eq 0 ]; then
+                    locked_at=$i
+                fi
+            else
+                no_change_count=0
+            fi
+            
+            prev_state="$curr_state"
+        fi
+        
+        ((move_count++))
+    done
+    
+    # Get final score
+    tmux send-keys -t "$session" "q"
+    sleep 0.5
+    FINAL=$(tmux capture-pane -t "$session" -p)
+    SCORE=$(echo "$FINAL" | grep "Score:" | tail -1 | awk '{print $2}')
+    
+    END=$(date +%s.%N)
+    TIME_S=$(echo "$END - $START" | bc)
+    
+    # Cleanup
+    tmux kill-session -t "$session" 2>/dev/null
+    
+    # If never locked, set to total moves
+    if [ $locked_at -eq 0 ]; then
+        locked_at=$moves
+    fi
+    
+    echo "$move_count,$locked_at,$SCORE,$TIME_S"
+}
+
+# Test 10 games with lock detection
+echo "Testing 10 games for board locking..."
+for run in {1..10}; do
+    result=$(detect_lock 100 "lock_test_$run")
+    echo "$run,$result" >> ../experiments/exp_011/exp_011_lock_detection.csv
+    echo "Run $run: $result"
+done
+
+echo -e "\n=== Lock Detection Analysis ==="
+awk -F, 'NR>1 {
+    total+=$2; 
+    locked+=$3; 
+    if($3<$2) locked_games++
+} END {
+    print "Average moves before lock: " locked/NR
+    print "Games that locked: " locked_games " (" locked_games/NR*100 "%)"
+    print "Average total moves: " total/NR
+}' ../experiments/exp_011/exp_011_lock_detection.csv
+#+end_src
+
 *** Analysis Script
 #+begin_src python :tangle exp_011/scripts/exp_011_analysis.py :mkdirp yes
 import pandas as pd
@@ -185,6 +283,13 @@ base_dir = os.path.dirname(__file__)
 curve_df = pd.read_csv(os.path.join(base_dir, '../exp_011_timing_curve.csv'))
 phases_df = pd.read_csv(os.path.join(base_dir, '../exp_011_phases.csv'))
 density_df = pd.read_csv(os.path.join(base_dir, '../exp_011_density.csv'))
+
+# Try to load lock detection data if it exists
+try:
+    lock_df = pd.read_csv(os.path.join(base_dir, '../exp_011_lock_detection.csv'))
+    has_lock_data = True
+except:
+    has_lock_data = False
 
 # Aggregate timing curve data
 timing_stats = curve_df.groupby('moves').agg({
@@ -291,6 +396,22 @@ startup_effect = (timing_stats.iloc[0]['ms_per_move'] - timing_stats.iloc[-1]['m
 print(f"1. Startup effect: {startup_effect:.1f}% decrease from 10 to 200 moves")
 print(f"2. Optimal batch size for experiments: 100+ moves")
 print(f"3. True per-move cost after startup: ~{timing_stats.iloc[-1]['ms_per_move']:.0f}ms")
+
+if has_lock_data:
+    print("\n=== BOARD LOCKING ANALYSIS ===")
+    locked_games = lock_df[lock_df['locked_at_move'] < lock_df['total_moves']]
+    print(f"Games that locked: {len(locked_games)}/{len(lock_df)} ({len(locked_games)/len(lock_df)*100:.1f}%)")
+    if len(locked_games) > 0:
+        print(f"Average moves before lock: {locked_games['locked_at_move'].mean():.1f}")
+        print(f"Earliest lock: move {locked_games['locked_at_move'].min()}")
+        print(f"Latest lock: move {locked_games['locked_at_move'].max()}")
+        
+        # Compare timing for locked vs unlocked portions
+        avg_time_per_move = lock_df['time_s'].mean() / lock_df['total_moves'].mean()
+        print(f"\nTiming implications:")
+        print(f"Average time for 100 moves: {lock_df['time_s'].mean():.2f}s")
+        print(f"This includes both active and locked moves")
+        print(f"No-op moves likely process faster, contributing to overall speedup")
 #+end_src
 
 ** EXPECTED RESULTS
@@ -299,6 +420,11 @@ print(f"3. True per-move cost after startup: ~{timing_stats.iloc[-1]['ms_per_mov
 3. *Phase analysis*: Early game slower due to more tile spawning animations
 4. *Density impact*: Minimal (<10%) effect on timing
 5. *Best model*: Startup + constant per-move cost
+6. *Board locking*: 
+   - ~60-80% of games will lock before 100 moves with down-right spam
+   - Locks typically occur between moves 40-80
+   - Locked boards continue processing moves as no-ops
+   - No-op moves contribute to faster average timing
 
 ** OBSERVATIONS
 [To be filled during experiment]
