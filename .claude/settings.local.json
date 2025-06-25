@@ -20,7 +20,12 @@
       "Bash(# Save current game state to binary file\ntmux send-keys -t lldb2048 \"memory read --outfile game_quicksave.bin --binary --count 200 g\" Enter)",
       "Bash(# Check if LLDB is still running with the game\ntmux capture-pane -t lldb2048:0 -p | tail -20)",
       "Bash(# Send DOWN to merge the 8s\ntmux send-keys -t lldb2048:0 \"s\")",
-      "Bash(# Check result\nsleep 1\ntmux capture-pane -t lldb2048:0 -p | grep -B 2 -A 10 \"Score:\")"
+      "Bash(# Check result\nsleep 1\ntmux capture-pane -t lldb2048:0 -p | grep -B 2 -A 10 \"Score:\")",
+      "Bash(# Let the game initialize\nsleep 1\n\n# Check the game display\ntmux capture-pane -t game2048_fresh -p)",
+      "Bash(# Use the newer PID\ntmux send-keys -t game2048_fresh:lldb C-c  # Cancel if needed\ntmux send-keys -t game2048_fresh:lldb \"lldb -p 21821\" Enter)",
+      "Bash(# Check final state\nsleep 1\ntmux capture-pane -t clean2048 -p)",
+      "Bash(# Save current state with our workflow\n/Users/jasonwalsh/projects/jwalsh/2048/save_analyze_workflow.sh)",
+      "Bash(# Manually save the game state\ntmux send-keys -t game2048:lldb \"memory read --outfile score180_grid.bin --binary --count 64 g->grid_data_ptr\" Enter\nsleep 0.5\ntmux send-keys -t game2048:lldb \"process save-core score180_game.core\" Enter)"
     ]
   },
   "enableAllProjectMcpServers": false

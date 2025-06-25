@@ -82,3 +82,35 @@ We've been using column-major indexing when the game likely uses row-major (stan
 2. Fix decoding in all analysis scripts
 3. Re-analyze saved game states
 4. Update documentation with correct interpretation
+
+## Testing Chaos Documentation
+
+### Attempt 1: Wrong PID Attachment
+- Multiple 2048 processes running from previous sessions
+- Attached to zombie process (PID 7218) instead of active game
+- Lesson: Always verify correct PID with `ps aux | grep 2048`
+
+### Attempt 2: tmux Window Confusion
+- Created game in one window, LLDB in another
+- Lost track of which window had which process
+- Commands sent to wrong panes
+- Lesson: Use clear naming for tmux sessions/windows
+
+### Attempt 3: Over-eager Automation
+```bash
+# Tried to send 100 moves as "sd" repeated 50 times
+for i in {1..50}; do
+    tmux send-keys -t clean2048 "sd"
+done
+# Result: Sent "sdsdsdsd..." as one long string!
+```
+Lesson: Need delays between moves or individual key sends
+
+### The Right Way
+1. Start fresh with clear session names
+2. Verify process PIDs before attaching
+3. Use proper delays between moves
+4. Check UI matches memory interpretation
+5. Document everything (including failures!)
+
+As the user said: "lol, such is testing :D"

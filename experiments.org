@@ -1,0 +1,355 @@
+#+TITLE: 2048 LLDB Debugging: Laboratory Notebook
+#+AUTHOR: Claude & jwalsh
+#+DATE: [2025-06-23]--[2025-06-25]
+#+PROPERTY: header-args :mkdirp yes
+
+* PROJECT: Interactive Program Control Through LLDB
+:PROPERTIES:
+:ID: proj-2048-lldb-control
+:GOAL: Learn to control running programs through debugger without source modification
+:END:
+
+The goal isn't beating 2048 - it's proving LLMs can use debuggers to understand and control programs.
+
+* EXPERIMENT [2025-06-23] #001: TTY Control Without Source Modification
+:PROPERTIES:
+:ID: exp-001-tty-control
+:HYPOTHESIS: We can control 2048 through TTY interface without modifying source
+:END:
+
+** HYPOTHESIS
+Direct TTY interaction will allow:
+- Sending keystrokes to running game
+- Capturing game state from terminal output
+- Building automated gameplay without game modification
+
+** METHOD
+*** Approach 1: Python TTY Reader
+#+begin_src python :tangle experiments/exp_001_tty_reader.py
+import pty
+import os
+import select
+import time
+
+def read_game_output(master_fd, timeout=0.1):
+    """Read available output from PTY"""
+    readable, _, _ = select.select([master_fd], [], [], timeout)
+    if readable:
+        return os.read(master_fd, 1024).decode('utf-8', errors='ignore')
+    return ""
+#+end_src
+
+*** Approach 2: Expect Scripts
+#+begin_src tcl :tangle experiments/exp_001_expect.exp
+spawn ./2048
+expect "Score:"
+send "s"
+expect "Score:"
+send "d"
+#+end_src
+
+*** Approach 3: tmux Automation
+#+begin_src bash :tangle experiments/exp_001_tmux.sh
+tmux new-session -d -s game2048 './2048'
+tmux send-keys -t game2048 "s"  # down
+sleep 0.1
+tmux send-keys -t game2048 "d"  # right
+#+end_src
+
+** OBSERVATIONS
+*** Python TTY Reader
+- ✅ Successfully spawned game process
+- ✅ Captured initial board state
+- ❌ OSError [Errno 5] after ~100 moves
+- Note: "remember basics: it's a tty; don't over think it" - user
+
+*** Expect Scripts
+- ✅ Clean interaction model
+- ✅ Reliable for scripted sequences
+- User: "nice, expect was the right way to go"
+
+*** tmux Sessions
+- ✅ Most reliable approach
+- ✅ Persistent sessions
+- ✅ Easy state inspection
+
+** CONCLUSIONS
+tmux provides the most reliable TTY interaction for long-running sessions.
+
+* EXPERIMENT [2025-06-23] #002: Down-Right Spam Strategy Validation
+:PROPERTIES:
+:ID: exp-002-downright-spam
+:CONTEXT: [[id:exp-001-tty-control][TTY control established]]
+:END:
+
+** HYPOTHESIS
+Academic heuristic of weighted down-right spam (40% down, 30% right, 20% left, 10% up) will achieve high scores.
+
+** METHOD
+#+begin_src bash :tangle experiments/exp_002_spam.sh :results output
+#!/bin/bash
+MOVES=""
+SCORE=0
+
+for i in {1..500}; do
+    RAND=$((RANDOM % 10))
+    if [ $RAND -lt 4 ]; then
+        MOVES="${MOVES}s"  # down (40%)
+    elif [ $RAND -lt 7 ]; then
+        MOVES="${MOVES}d"  # right (30%)
+    elif [ $RAND -lt 9 ]; then
+        MOVES="${MOVES}a"  # left (20%)
+    else
+        MOVES="${MOVES}w"  # up (10%)
+    fi
+done
+
+echo "Move sequence generated: ${#MOVES} moves"
+#+end_src
+
+** OBSERVATIONS
+- Score achieved: 1708
+- User: "dumbest idea ever :D" (but it worked!)
+- Highest tile: Unknown (didn't check)
+- Proved academic heuristic is effective
+
+** CONCLUSIONS
+Down-right spam with weighted randomness is surprisingly effective.
+
+* EXPERIMENT [2025-06-24] #003: LLDB Memory Inspection
+:PROPERTIES:
+:ID: exp-003-lldb-memory
+:HYPOTHESIS: Game state can be read directly from memory
+:END:
+
+** HYPOTHESIS
+LLDB can:
+1. Attach to running 2048 process
+2. Read gamestate structure
+3. Extract grid values and score
+4. Monitor state changes in real-time
+
+** METHOD
+*** Build with Debug Symbols
+#+begin_src bash :tangle experiments/exp_003_build.sh
+clang -g -O0 -DINVERT_COLORS -DVT100 src/*.c -o 2048-debug
+#+end_src
+
+*** LLDB Inspection Commands
+#+begin_src lldb :tangle experiments/exp_003_commands.lldb
+breakpoint set -n gamestate_tick
+breakpoint set -n gamestate_new_block
+run
+
+# When stopped, inspect state
+print *g
+print g->score
+memory read -f d -c 16 g->grid_data_ptr
+#+end_src
+
+** OBSERVATIONS
+*** Memory Layout Discovery
+#+begin_example
+(gamestate) {
+  grid_data_ptr = 0x000060000014c040
+  grid = 0x000060000144c120
+  gridsize = 16
+  moved = 0
+  score = 0
+  score_high = 1900
+  score_last = 0
+  print_width = 5
+  blocks_in_play = 0
+  opts = 0x000060000144c100
+}
+#+end_example
+
+*** Grid Storage
+- 16 integers (4x4 grid)
+- Values are powers of 2: 0=empty, 1=2, 2=4, 3=8, etc.
+- Initially assumed column-major (WRONG!)
+
+** CONCLUSIONS
+Successfully discovered internal data structures without reading source.
+
+* EXPERIMENT [2025-06-25] #004: Grid Layout Interpretation
+:PROPERTIES:
+:ID: exp-004-grid-layout
+:CONTEXT: [[id:exp-003-lldb-memory][Memory inspection working]]
+:ISSUE: Board appears "flipped" after down-right spam
+:END:
+
+** HYPOTHESIS
+Grid is stored in column-major order (like Fortran).
+
+** METHOD
+#+begin_src python :tangle experiments/exp_004_decode.py :results output
+def decode_grid(values, method="column-major"):
+    print(f"=== {method.upper()} ===")
+    for row in range(4):
+        row_str = "|"
+        for col in range(4):
+            if method == "column-major":
+                idx = col * 4 + row
+            else:  # row-major
+                idx = row * 4 + col
+            val = values[idx]
+            tile = (2 ** val) if val > 0 else 0
+            row_str += f"{str(tile):>5} |"
+        print(row_str)
+
+# Test with actual memory dump
+values = [3,1,3,1, 0,3,4,3, 0,1,0,6, 0,0,0,2]
+decode_grid(values, "column-major")
+print()
+decode_grid(values, "row-major")
+#+end_src
+
+#+RESULTS:
+: === COLUMN-MAJOR ===
+: |    8 |    0 |    0 |    0 |
+: |    2 |    8 |    2 |    0 |
+: |    8 |   16 |    0 |    0 |
+: |    2 |    8 |   64 |    4 |
+: 
+: === ROW-MAJOR ===
+: |    8 |    2 |    8 |    2 |
+: |    0 |    8 |   16 |    8 |
+: |    0 |    2 |    0 |   64 |
+: |    0 |    0 |    0 |    4 |
+
+** OBSERVATIONS
+- User: "if we're spamming down and right that the board looks 'flipped'"
+- Row-major shows 64 moving toward bottom-right (expected!)
+- Column-major shows scattered pattern (wrong!)
+
+** CONCLUSIONS
+❌ Initial hypothesis WRONG. Grid uses standard C row-major layout.
+
+* EXPERIMENT [2025-06-25] #005: UI vs Memory Alignment Verification
+:PROPERTIES:
+:ID: exp-005-ui-memory-alignment
+:CONTEXT: [[id:exp-004-grid-layout][Corrected to row-major]]
+:END:
+
+** HYPOTHESIS
+UI display and memory representation are perfectly synchronized.
+
+** METHOD
+*** Capture UI and Memory Simultaneously
+#+begin_src bash :tangle experiments/exp_005_capture.sh
+# Capture UI
+tmux capture-pane -t game2048 -p > ui_state.txt
+
+# Capture memory
+tmux send-keys -t lldb2048 "memory read -f d -c 16 g->grid_data_ptr" Enter
+sleep 0.5
+tmux capture-pane -t lldb2048 -p > memory_state.txt
+#+end_src
+
+*** Compare Results
+#+begin_src python :tangle experiments/exp_005_compare.py
+# UI shows:
+# |      |      |      |      |
+# |      |      |    2 |    4 |
+# |      |    2 |    4 |    8 |
+# |      |    4 |   16 |   32 |
+
+# Memory shows values that decode to:
+# |    0 |    0 |    0 |    0 |
+# |    0 |    0 |    2 |    4 |
+# |    0 |    2 |    4 |   16 |  <- 16 here
+# |    0 |    4 |    8 |   32 |  <- 8 here
+
+print("MISMATCH: Positions [2][3] and [3][2] are swapped!")
+#+end_src
+
+** OBSERVATIONS
+- Score matches (180)
+- Most tiles match
+- Two tiles (8 and 16) appear swapped
+- Consistent reproduction of mismatch
+
+** POSSIBLE CAUSES
+1. Race condition between debugger read and display update
+2. UI rendering buffer vs actual game state
+3. Debugger interrupting game mid-update
+4. Cache coherency issues
+
+** CONCLUSIONS
+❌ UI and memory are NOT always perfectly aligned. This has implications for save/restore functionality.
+
+* EXPERIMENT [2025-06-25] #006: Process Management Chaos
+:PROPERTIES:
+:ID: exp-006-process-chaos
+:TAGS: failure learning
+:END:
+
+** HYPOTHESIS
+We can cleanly manage multiple debugging sessions.
+
+** METHOD
+"Just attach to the running game" 
+
+** OBSERVATIONS
+*** The Zombie Apocalypse
+#+begin_example
+jasonwalsh  7218  99.7  0.0  2048-debug  (running for 2+ hours)
+jasonwalsh 21821  0.0   0.0  2048-debug  (new process)
+jasonwalsh  2928  99.4  0.0  2048        (3+ hours!)
+jasonwalsh 44541  98.6  0.0  2048        (since yesterday!)
+#+end_example
+
+*** What Went Wrong
+1. Attached to wrong PID (zombie from hours ago)
+2. Created game in one tmux window, LLDB in another
+3. Lost track of which session was which
+4. Commands concatenated: "scontinue" instead of "s" then "continue"
+
+** LESSONS LEARNED
+- Always `pkill -f 2048` before starting fresh
+- Name tmux sessions clearly
+- Verify PID before attaching
+- Add delays between commands (0.2-0.3s minimum)
+
+** CONCLUSIONS
+"lol, such is testing :D" - user
+
+Process hygiene is critical for reliable debugging sessions.
+
+* META: Experimental Methodology Evolution
+:PROPERTIES:
+:ID: meta-methodology
+:END:
+
+** What We've Learned About Learning
+
+1. **Start simple, fail fast**: TTY control → Expect → tmux
+2. **Question assumptions**: Column-major? No, row-major!
+3. **Verify everything**: UI might not match memory
+4. **Document failures**: They're often more instructive
+5. **Embrace the chaos**: "the boring is the learning"
+
+** Key Insights
+
+- The goal was never beating 2048
+- It's about proving LLMs can debug unknown programs
+- Every failed attempt taught us something
+- Real debugging is messy and iterative
+
+** Tools Developed
+- [[file:save_analyze_workflow.sh][save_analyze_workflow.sh]] - Automated state capture
+- [[file:dep.sh][dep.sh]] - Dependency checker
+- [[file:filesystem_board_demo.sh][filesystem_board_demo.sh]] - Creative state representation
+
+** Open Questions
+1. Why does UI sometimes mismatch memory?
+2. Can we restore from core dumps reliably?
+3. What's the minimum delay to prevent command concatenation?
+4. Is there a pattern to RNG tile spawning?
+
+* NEXT Experiments
+- [ ] #007: Core dump restoration workflow
+- [ ] #008: Minimum timing constants determination  
+- [ ] #009: RNG seed investigation
+- [ ] #010: Save state injection via memory write
