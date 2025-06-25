@@ -85,4 +85,15 @@ deps:
 	## Install dependencies
 	@scripts/deps.sh
 
+README.md: README.org
+	## Generate README.md from README.org for PyPI/GitHub
+	@echo "Generating README.md from README.org..."
+	@emacs --batch \
+		--eval "(require 'org)" \
+		--eval "(require 'ox-md)" \
+		--eval "(find-file \"README.org\")" \
+		--eval "(org-md-export-to-markdown)" \
+		--eval "(kill-emacs)"
+	@echo "Generated README.md"
+
 .PHONY: clean remake all terminal curses sdl debug-terminal debug-curses debug-sdl gdb-run deps

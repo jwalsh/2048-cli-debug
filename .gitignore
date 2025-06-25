@@ -7,3 +7,5 @@ TAGS
 !2048-cli-src-backup.tar.gz
 # Ignore generated text report
 experiments/README.txt
+# Ignore generated README.md (created from README.org)
+README.md

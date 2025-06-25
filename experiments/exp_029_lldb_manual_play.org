@@ -1,0 +1,269 @@
+#+TITLE: Experiment #029: LLDB Manual Play Analysis
+#+DATE: [2025-06-25]
+#+STATUS: PLANNED
+
+* EXPERIMENT #029: LLDB Manual Play Analysis
+:PROPERTIES:
+:ID: exp-029-lldb-manual-play
+:HYPOTHESIS: Manual play with LLDB inspection reveals strategic insights
+:STATUS: PLANNED
+:END:
+
+** HYPOTHESIS
+Using LLDB during manual play will:
+1. Show how board state evolves with specific strategies
+2. Reveal memory patterns during down-right spam
+3. Identify when boards become "locked"
+4. Provide insights for AI improvements
+
+** RATIONALE
+Combining manual play with real-time memory inspection allows:
+- Understanding the relationship between moves and memory
+- Identifying patterns invisible in the UI
+- Testing specific hypotheses about board states
+- Learning optimal breakpoint placement
+
+** METHOD
+
+*** Session Setup Script
+#+begin_src bash :tangle exp_029/scripts/setup_manual_session.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# LLDB Manual Session for 2048 Debugging
+# Date: 2025-06-25
+# Goal: Learn memory inspection through manual play
+
+cat << 'EOF' > exp_029/lldb_commands.txt
+# Set breakpoints at key functions
+breakpoint set -n gamestate_tick
+breakpoint set -n gamestate_new_block
+
+# Run the game
+run
+
+# Commands to use during session:
+# Continue execution: continue (or c)
+# Print game state: print *g
+# Print score: print g->score
+# Print grid size: print g->gridsize
+# Examine grid memory (16 ints for 4x4): memory read -f d -c 16 g->grid_data_ptr
+# Print specific cell: print g->grid[col][row]
+# Backtrace: bt
+# List breakpoints: breakpoint list
+# Delete breakpoint: breakpoint delete 1
+EOF
+
+echo "Starting LLDB session..."
+echo "Commands saved to exp_029/lldb_commands.txt"
+
+# Start LLDB with our debug build
+lldb ./2048-cli-0.9.1/2048-debug -s exp_029/lldb_commands.txt
+#+end_src
+
+*** Phase 1: Down-Right Spam Analysis
+#+begin_src bash :tangle exp_029/scripts/phase1_analysis.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Phase 1: 20 turns of down-right spam
+# Alternate between 's' (down) and 'd' (right)
+# At each breakpoint, inspect memory
+
+OUTPUT="exp_029/data/phase1_spam_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p exp_029/data
+
+cat << 'EOF' > exp_029/phase1_commands.lldb
+# Phase 1 Commands
+# After each move, examine state
+
+# Custom command to dump board state
+command script add -f exp_029_board_dump.dump_board board_dump
+
+# Continue and let user play
+continue
+EOF
+
+echo "Phase 1: Down-Right Spam (20 moves)"
+echo "Alternate s and d keys"
+echo "Memory state will be logged to: $OUTPUT"
+#+end_src
+
+*** Phase 2: Strategic Play Analysis
+#+begin_src bash :tangle exp_029/scripts/phase2_analysis.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Phase 2: 5 manual strategic moves
+# Analyze board state carefully before each move
+# Document reasoning for each move
+
+OUTPUT="exp_029/data/phase2_strategic_$(date +%Y%m%d_%H%M%S).log"
+mkdir -p exp_029/data
+
+echo "Phase 2: Strategic Play (5 moves)"
+echo "Before each move:"
+echo "1. Analyze current board state"
+echo "2. Document your reasoning"
+echo "3. Predict the outcome"
+echo "4. Make the move"
+echo "5. Compare prediction vs actual"
+echo ""
+echo "Logging to: $OUTPUT"
+#+end_src
+
+*** Python Helper for Board Analysis
+#+begin_src python :tangle exp_029/scripts/exp_029_board_dump.py :mkdirp yes
+#!/usr/bin/env python3
+"""LLDB Python script for board state analysis during manual play."""
+
+import lldb
+
+def dump_board(debugger, command, result, internal_dict):
+    """Dump current board state with analysis."""
+    target = debugger.GetSelectedTarget()
+    process = target.GetProcess()
+    thread = process.GetSelectedThread()
+    frame = thread.GetSelectedFrame()
+    
+    # Get game state
+    g = frame.FindVariable("g")
+    if not g.IsValid():
+        result.AppendMessage("Error: Cannot find game state variable 'g'")
+        return
+    
+    # Extract score
+    score = g.GetChildMemberWithName('score').GetValueAsSigned()
+    blocks = g.GetChildMemberWithName('blocks_in_play').GetValueAsSigned()
+    
+    # Read grid
+    grid_ptr = g.GetChildMemberWithName('grid_data_ptr').GetValueAsUnsigned()
+    error = lldb.SBError()
+    
+    print(f"\n=== Board State ===")
+    print(f"Score: {score}")
+    print(f"Blocks in play: {blocks}")
+    print("Grid:")
+    
+    # Print grid in UI format
+    for row in range(4):
+        row_values = []
+        for col in range(4):
+            # Remember: grid[col][row] indexing!
+            idx = col * 4 + row
+            addr = grid_ptr + (idx * 4)
+            data = process.ReadMemory(addr, 4, error)
+            if error.Success():
+                value = int.from_bytes(data, 'little')
+                if value > 0:
+                    display = str(2**value)
+                else:
+                    display = "."
+                row_values.append(f"{display:>4}")
+        print(" ".join(row_values))
+    
+    # Analysis
+    print("\n=== Analysis ===")
+    # Count empty cells
+    empty = 16 - blocks
+    print(f"Empty cells: {empty}")
+    
+    # Check for locked state (down-right spam)
+    # This would need more sophisticated analysis
+    print("Board complexity: [TODO]")
+
+def __lldb_init_module(debugger, internal_dict):
+    debugger.HandleCommand('command script add -f exp_029_board_dump.dump_board board_dump')
+    print("Board dump command loaded. Use 'board_dump' to analyze current state.")
+#+end_src
+
+*** Data Collection Script
+#+begin_src bash :tangle exp_029/scripts/collect_session_data.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Collect and analyze manual play session data
+
+SESSION_DIR="exp_029/sessions/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$SESSION_DIR"
+
+# Start recording session
+script -q "$SESSION_DIR/terminal.log" << 'EOF'
+echo "=== Manual Play Session ==="
+echo "Starting LLDB..."
+
+# Load Python helpers
+lldb ./2048-cli-0.9.1/2048-debug << 'LLDB_EOF'
+command script import exp_029/scripts/exp_029_board_dump.py
+breakpoint set -n gamestate_tick
+run
+
+# Let user play
+# They should use board_dump command periodically
+LLDB_EOF
+EOF
+
+echo "Session complete. Data saved to: $SESSION_DIR"
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Phase 1 (Spam)*: 
+   - Board fills quickly
+   - Predictable patterns emerge
+   - Eventually reaches locked state
+
+2. *Phase 2 (Strategic)*:
+   - Higher scores possible
+   - More complex board states
+   - Different memory patterns
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** PLANNED ANALYSIS
+
+1. *Memory Evolution*: Track how grid_data_ptr contents change
+2. *Score Progression*: Graph score vs move number
+3. *Complexity Metrics*: Measure board entropy over time
+4. *Lock Detection*: Identify when moves stop changing state
+
+** IMPLEMENTATION NOTES
+
+*** Key LLDB Commands Reference
+#+begin_example
+# Print entire game state
+(lldb) print *g
+
+# Print just the score
+(lldb) print g->score
+
+# Show grid as integers
+(lldb) memory read -f d -c 16 g->grid_data_ptr
+
+# Show grid as hex (useful for patterns)
+(lldb) memory read -f x -c 16 g->grid_data_ptr
+
+# Access specific cell (remember: col,row not row,col!)
+(lldb) print g->grid[3][0]  # top-right cell
+
+# Set watchpoint on score
+(lldb) watchpoint set variable g->score
+
+# Continue until next breakpoint
+(lldb) continue
+#+end_example
+
+*** Session Protocol
+1. Start LLDB with script recording
+2. Load Python analysis helpers
+3. Set initial breakpoints
+4. Phase 1: 20 moves of down-right spam
+5. Checkpoint: Full state dump
+6. Phase 2: 5 strategic moves with analysis
+7. Final state dump and session summary
+
+** NEXT STEPS
+
+1. Execute the manual play session
+2. Analyze collected data
+3. Compare spam vs strategic patterns
+4. Develop automated pattern detection
+5. Create visualization of memory evolution
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: Basic LLDB memory inspection
+- [[file:exp_005_ui_memory_alignment.org][Experiment #005]]: UI/memory relationship
+- [[file:exp_011_timing_curve_analysis.org][Experiment #011]]: Board locking hypothesis
