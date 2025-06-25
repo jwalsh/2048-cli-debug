@@ -1,0 +1,89 @@
+#!/usr/bin/expect -f
+# Claude plays 2048 strategically using expect
+
+set timeout 10
+set score 0
+set move_count 0
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+puts "\n🎮 Claude Playing 2048 with Expect\n"
+
+# Function to wait for board update
+proc wait_for_board {} {
+    expect "Score:"
+    sleep 0.2
+}
+
+# Initial board
+wait_for_board
+puts "Initial board captured"
+
+# Spam phase - build up complexity
+puts "\n1️⃣ SPAM PHASE - Building score..."
+for {set i 0} {$i < 200} {incr i} {
+    # Down-right spam pattern
+    set r [expr {rand()}]
+    if {$r < 0.5} {
+        send "s"
+    } elseif {$r < 0.8} {
+        send "d"
+    } elseif {$r < 0.9} {
+        send "a"
+    } else {
+        send "w"
+    }
+    
+    # Quick moves
+    after 20
+    
+    # Check progress every 50 moves
+    if {$i % 50 == 0} {
+        wait_for_board
+        puts "  Spam move $i completed"
+    }
+}
+
+# Let it settle
+sleep 0.5
+wait_for_board
+
+puts "\n2️⃣ CLAUDE TAKING CONTROL"
+puts "Looking at the board state..."
+
+# Strategic moves
+set strategies {
+    {s d s d}
+    {d s a s}
+    {s d d s}
+    {a s d s}
+    {s s d d}
+}
+
+foreach strategy $strategies {
+    puts "\nExecuting strategy: $strategy"
+    foreach move $strategy {
+        send $move
+        after 200
+        incr move_count
+    }
+    wait_for_board
+}
+
+puts "\n3️⃣ Final aggressive push"
+# Try to maximize score
+for {set i 0} {$i < 50} {incr i} {
+    send "s"
+    after 50
+    send "d"
+    after 50
+}
+
+# Show final state
+wait_for_board
+puts "\n✅ Game complete!"
+puts "Total moves: [expr {200 + $move_count + 100}]"
+
+# Quit
+send "q"
+expect eof

@@ -1,0 +1,22 @@
+#!/usr/bin/expect -f
+# Claude plays 2048 using expect
+
+set timeout 5
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+
+# Wait for board to appear
+expect "Score:"
+sleep 0.5
+
+# Send a move
+send "s"
+sleep 0.5
+
+# Capture result
+expect "Score:"
+
+# Quit
+send "q"
+expect eof
