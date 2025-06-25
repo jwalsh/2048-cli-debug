@@ -7,7 +7,11 @@
 [![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-A comprehensive debugging and analysis environment for the [2048-cli](https://github.com/Tiehuis/2048-cli) game, featuring LLDB integration, memory analysis tools, and Emacs development support.
+Learning to interact with running programs through TTY, screen, expect, and eventually GDB/LLDB. Using [2048-cli](https://github.com/Tiehuis/2048-cli) as a test case for real-time program control and state inspection.
+
+**The score doesn't matter - the interaction does!** 🎮
+
+This project documents the journey from failed Python abstractions to successful expect scripts, with the ultimate goal of debugger-based program control.
 
 ## 🎮 Game Screenshots
 
