@@ -1,0 +1,10 @@
+ODDITY: Score parsing in expect
+
+During spam phase (first 500 moves), score consistently showed as 0 even though tiles were merging. Once Claude took control, scores started updating properly (12, 16, 28, etc.).
+
+Possible causes:
+1. Expect regex for score capture might be timing-sensitive
+2. Rapid moves during spam might interfere with buffer capture
+3. The expect_out buffer might not be updated correctly during fast moves
+
+This doesn't affect gameplay but makes it hard to detect when board is truly 'difficult' based on score alone. May need to parse actual board tiles instead.
