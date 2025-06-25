@@ -1,0 +1,578 @@
+#+TITLE: Experiment #030: Board Complexity Metrics Implementation
+#+DATE: [2025-06-25]
+#+STATUS: IN-PROGRESS
+
+* EXPERIMENT #030: Board Complexity Metrics Implementation
+:PROPERTIES:
+:ID: exp-030-board-complexity-metrics
+:HYPOTHESIS: Board complexity can be quantified through multiple metrics
+:STATUS: IN-PROGRESS
+:END:
+
+** HYPOTHESIS
+A comprehensive board complexity score combining multiple metrics will:
+1. Correlate with game difficulty
+2. Predict when boards become "locked"
+3. Help AI players make better decisions
+4. Quantify the difference between random and strategic play
+
+** RATIONALE
+Current complexity scoring is ad-hoc. A rigorous implementation would:
+- Provide consistent board evaluation
+- Enable comparison between different game states
+- Help identify critical decision points
+- Support AI strategy development
+
+** METHOD
+
+*** Core Complexity Metrics
+
+**** 1. Entropy-based Complexity
+#+begin_src python :tangle exp_030/scripts/entropy_complexity.py :mkdirp yes
+#!/usr/bin/env python3
+"""Calculate board entropy as a complexity measure."""
+
+import numpy as np
+from typing import List, Tuple
+import math
+
+def calculate_entropy(board: List[List[int]]) -> float:
+    """
+    Calculate Shannon entropy of the board.
+    Higher entropy = more disorder = higher complexity.
+    """
+    # Flatten and filter non-zero values
+    values = [cell for row in board for cell in row if cell > 0]
+    
+    if not values:
+        return 0.0
+    
+    # Count occurrences
+    counts = {}
+    for val in values:
+        counts[val] = counts.get(val, 0) + 1
+    
+    # Calculate probabilities
+    total = len(values)
+    entropy = 0.0
+    
+    for count in counts.values():
+        if count > 0:
+            p = count / total
+            entropy -= p * math.log2(p)
+    
+    return entropy
+
+def calculate_positional_entropy(board: List[List[int]]) -> float:
+    """
+    Calculate entropy considering tile positions.
+    """
+    size = len(board)
+    position_values = {}
+    
+    for i in range(size):
+        for j in range(size):
+            if board[i][j] > 0:
+                pos_key = (i, j)
+                if board[i][j] not in position_values:
+                    position_values[board[i][j]] = []
+                position_values[board[i][j]].append(pos_key)
+    
+    # Calculate spatial distribution entropy
+    total_entropy = 0.0
+    for value, positions in position_values.items():
+        if len(positions) > 1:
+            # Calculate centroid
+            centroid_x = sum(p[0] for p in positions) / len(positions)
+            centroid_y = sum(p[1] for p in positions) / len(positions)
+            
+            # Calculate variance from centroid
+            variance = sum((p[0] - centroid_x)**2 + (p[1] - centroid_y)**2 
+                         for p in positions) / len(positions)
+            
+            total_entropy += math.log2(1 + variance)
+    
+    return total_entropy
+#+end_src
+
+**** 2. Monotonicity Score
+#+begin_src python :tangle exp_030/scripts/monotonicity_score.py :mkdirp yes
+#!/usr/bin/env python3
+"""Calculate board monotonicity (how well-ordered tiles are)."""
+
+def calculate_monotonicity(board: List[List[int]]) -> float:
+    """
+    Measure how monotonic the board is.
+    Perfect monotonicity = tiles increase/decrease consistently.
+    """
+    size = len(board)
+    scores = {'up': 0, 'down': 0, 'left': 0, 'right': 0}
+    
+    # Check vertical monotonicity
+    for j in range(size):
+        for i in range(size - 1):
+            if board[i][j] != 0 and board[i+1][j] != 0:
+                if board[i][j] > board[i+1][j]:
+                    scores['up'] += math.log2(board[i][j]) - math.log2(board[i+1][j])
+                else:
+                    scores['down'] += math.log2(board[i+1][j]) - math.log2(board[i][j])
+    
+    # Check horizontal monotonicity
+    for i in range(size):
+        for j in range(size - 1):
+            if board[i][j] != 0 and board[i][j+1] != 0:
+                if board[i][j] > board[i][j+1]:
+                    scores['left'] += math.log2(board[i][j]) - math.log2(board[i][j+1])
+                else:
+                    scores['right'] += math.log2(board[i][j+1]) - math.log2(board[i][j])
+    
+    # Return best direction score
+    return max(scores['up'] + scores['down'], scores['left'] + scores['right'])
+#+end_src
+
+**** 3. Smoothness Score
+#+begin_src python :tangle exp_030/scripts/smoothness_score.py :mkdirp yes
+#!/usr/bin/env python3
+"""Calculate board smoothness (similarity of adjacent tiles)."""
+
+def calculate_smoothness(board: List[List[int]]) -> float:
+    """
+    Measure how smooth the board is.
+    Lower values = smoother = better.
+    """
+    size = len(board)
+    smoothness = 0.0
+    
+    for i in range(size):
+        for j in range(size):
+            if board[i][j] != 0:
+                val = math.log2(board[i][j]) if board[i][j] > 0 else 0
+                
+                # Check right neighbor
+                if j < size - 1 and board[i][j+1] != 0:
+                    target = math.log2(board[i][j+1]) if board[i][j+1] > 0 else 0
+                    smoothness -= abs(val - target)
+                
+                # Check down neighbor
+                if i < size - 1 and board[i+1][j] != 0:
+                    target = math.log2(board[i+1][j]) if board[i+1][j] > 0 else 0
+                    smoothness -= abs(val - target)
+    
+    return smoothness
+#+end_src
+
+**** 4. Free Tiles and Merge Potential
+#+begin_src python :tangle exp_030/scripts/merge_potential.py :mkdirp yes
+#!/usr/bin/env python3
+"""Calculate merge potential and free space metrics."""
+
+def calculate_free_tiles(board: List[List[int]]) -> Tuple[int, float]:
+    """
+    Count free tiles and calculate their strategic value.
+    """
+    size = len(board)
+    free_count = 0
+    free_positions = []
+    
+    for i in range(size):
+        for j in range(size):
+            if board[i][j] == 0:
+                free_count += 1
+                free_positions.append((i, j))
+    
+    # Calculate strategic value of free positions
+    if not free_positions:
+        return 0, 0.0
+    
+    # Prefer free tiles near edges and corners
+    edge_weight = 0.0
+    for i, j in free_positions:
+        if i == 0 or i == size-1:
+            edge_weight += 1.0
+        if j == 0 or j == size-1:
+            edge_weight += 1.0
+        # Corners are especially valuable
+        if (i == 0 or i == size-1) and (j == 0 or j == size-1):
+            edge_weight += 2.0
+    
+    return free_count, edge_weight / len(free_positions)
+
+def calculate_merge_potential(board: List[List[int]]) -> int:
+    """
+    Count potential merges available.
+    """
+    size = len(board)
+    merge_count = 0
+    
+    for i in range(size):
+        for j in range(size):
+            if board[i][j] != 0:
+                # Check right
+                if j < size-1 and board[i][j] == board[i][j+1]:
+                    merge_count += 1
+                # Check down
+                if i < size-1 and board[i][j] == board[i+1][j]:
+                    merge_count += 1
+    
+    return merge_count
+#+end_src
+
+*** Combined Complexity Score
+#+begin_src python :tangle exp_030/scripts/board_complexity.py :mkdirp yes
+#!/usr/bin/env python3
+"""Combined board complexity calculation."""
+
+import sys
+import json
+from typing import Dict, List, Any
+
+# Import all metrics
+from entropy_complexity import calculate_entropy, calculate_positional_entropy
+from monotonicity_score import calculate_monotonicity
+from smoothness_score import calculate_smoothness
+from merge_potential import calculate_free_tiles, calculate_merge_potential
+
+class BoardComplexityAnalyzer:
+    """Comprehensive board complexity analyzer."""
+    
+    def __init__(self, weights: Dict[str, float] = None):
+        """Initialize with optional custom weights."""
+        self.weights = weights or {
+            'entropy': 0.15,
+            'positional_entropy': 0.10,
+            'monotonicity': 0.25,
+            'smoothness': 0.20,
+            'free_tiles': 0.20,
+            'merge_potential': 0.10
+        }
+    
+    def analyze_board(self, board: List[List[int]]) -> Dict[str, Any]:
+        """Perform complete complexity analysis."""
+        # Calculate all metrics
+        entropy = calculate_entropy(board)
+        pos_entropy = calculate_positional_entropy(board)
+        monotonicity = calculate_monotonicity(board)
+        smoothness = calculate_smoothness(board)
+        free_count, free_value = calculate_free_tiles(board)
+        merge_potential = calculate_merge_potential(board)
+        
+        # Normalize metrics (0-1 scale)
+        metrics = {
+            'entropy': entropy / 4.0,  # Max entropy ~4 for diverse board
+            'positional_entropy': min(pos_entropy / 10.0, 1.0),
+            'monotonicity': min(monotonicity / 50.0, 1.0),
+            'smoothness': max(0, 1.0 + smoothness / 30.0),  # Smoothness is negative
+            'free_tiles': free_count / 16.0,
+            'merge_potential': min(merge_potential / 8.0, 1.0)
+        }
+        
+        # Calculate weighted score
+        complexity_score = sum(metrics[k] * self.weights[k] 
+                             for k in metrics)
+        
+        return {
+            'metrics': metrics,
+            'weights': self.weights,
+            'complexity_score': complexity_score,
+            'free_count': free_count,
+            'merge_count': merge_potential,
+            'classification': self._classify_complexity(complexity_score)
+        }
+    
+    def _classify_complexity(self, score: float) -> str:
+        """Classify board complexity level."""
+        if score < 0.2:
+            return "CRITICAL"  # Board is nearly locked
+        elif score < 0.4:
+            return "HIGH"      # Difficult situation
+        elif score < 0.6:
+            return "MEDIUM"    # Manageable
+        elif score < 0.8:
+            return "LOW"       # Good position
+        else:
+            return "TRIVIAL"   # Early game / easy
+
+    def analyze_board_from_string(self, board_str: str) -> Dict[str, Any]:
+        """Analyze board from space-separated string."""
+        values = list(map(int, board_str.strip().split()))
+        size = int(len(values) ** 0.5)
+        board = [[values[i*size + j] for j in range(size)] 
+                 for i in range(size)]
+        return self.analyze_board(board)
+
+def main():
+    """CLI interface for board complexity analysis."""
+    if len(sys.argv) > 1:
+        board_str = ' '.join(sys.argv[1:])
+        analyzer = BoardComplexityAnalyzer()
+        result = analyzer.analyze_board_from_string(board_str)
+        print(json.dumps(result, indent=2))
+    else:
+        print("Usage: python board_complexity.py <16 space-separated values>")
+        print("Example: python board_complexity.py 2 0 4 8 0 2 0 0 16 32 0 0 4 0 0 2")
+
+if __name__ == "__main__":
+    main()
+#+end_src
+
+*** Analyze Historical Game Logs
+#+begin_src python :tangle exp_030/scripts/analyze_game_logs.py :mkdirp yes
+#!/usr/bin/env python3
+"""Analyze complexity evolution from game logs."""
+
+import os
+import re
+import json
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import List, Optional
+from board_complexity import BoardComplexityAnalyzer
+
+def parse_board_from_snapshot(snapshot_path: str) -> Optional[List[int]]:
+    """Parse board from snapshot file format."""
+    board_values = []
+    
+    with open(snapshot_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Find the board section (between dashed lines)
+    in_board = False
+    for line in lines:
+        if '-----' in line:
+            if in_board:
+                break
+            in_board = True
+            continue
+        
+        if in_board and '|' in line:
+            # Parse row: |    2 |    4 |      |      |
+            row = line.strip().strip('|').split('|')
+            for cell in row:
+                cell = cell.strip()
+                if cell:
+                    # Handle both "2" and "   2" formats
+                    try:
+                        board_values.append(int(cell))
+                    except ValueError:
+                        board_values.append(0)
+                else:
+                    board_values.append(0)
+    
+    return board_values if len(board_values) == 16 else None
+
+def parse_board_from_log(log_line: str) -> List[int]:
+    """Extract board state from log line."""
+    # Look for board pattern like "Board: [2, 0, 4, 8, ...]"
+    match = re.search(r'Board:\s*\[([\d,\s]+)\]', log_line)
+    if match:
+        return list(map(int, match.group(1).replace(' ', '').split(',')))
+    
+    # Alternative format: just numbers
+    match = re.search(r'(\d+(?:\s+\d+){15})', log_line)
+    if match:
+        return list(map(int, match.group(1).split()))
+    
+    return None
+
+def analyze_log_file(log_path: str) -> pd.DataFrame:
+    """Analyze complexity evolution from a single log file."""
+    analyzer = BoardComplexityAnalyzer()
+    results = []
+    
+    with open(log_path, 'r') as f:
+        for i, line in enumerate(f):
+            board_values = parse_board_from_log(line)
+            if board_values:
+                board = [[board_values[i*4 + j] for j in range(4)] 
+                        for i in range(4)]
+                
+                analysis = analyzer.analyze_board(board)
+                analysis['move_number'] = i
+                analysis['timestamp'] = i  # Could parse actual timestamp
+                results.append(analysis)
+    
+    return pd.DataFrame(results)
+
+def visualize_complexity_evolution(df: pd.DataFrame, output_path: str):
+    """Create visualization of complexity evolution."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    
+    # Plot complexity score over time
+    ax1.plot(df['move_number'], df['complexity_score'], 'b-', linewidth=2)
+    ax1.set_xlabel('Move Number')
+    ax1.set_ylabel('Complexity Score')
+    ax1.set_title('Board Complexity Evolution')
+    ax1.grid(True, alpha=0.3)
+    
+    # Add classification zones
+    zones = {
+        'CRITICAL': (0, 0.2, 'red'),
+        'HIGH': (0.2, 0.4, 'orange'),
+        'MEDIUM': (0.4, 0.6, 'yellow'),
+        'LOW': (0.6, 0.8, 'lightgreen'),
+        'TRIVIAL': (0.8, 1.0, 'green')
+    }
+    
+    for zone, (ymin, ymax, color) in zones.items():
+        ax1.axhspan(ymin, ymax, alpha=0.2, color=color, label=zone)
+    
+    ax1.legend(loc='best')
+    
+    # Plot individual metrics
+    metrics_df = pd.json_normalize(df['metrics'])
+    for col in metrics_df.columns:
+        ax2.plot(df['move_number'], metrics_df[col], label=col, alpha=0.7)
+    
+    ax2.set_xlabel('Move Number')
+    ax2.set_ylabel('Normalized Metric Value')
+    ax2.set_title('Individual Complexity Metrics')
+    ax2.legend(loc='best')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"Visualization saved to {output_path}")
+
+def analyze_snapshots(test_dir: Path) -> pd.DataFrame:
+    """Analyze board snapshots from a test directory."""
+    analyzer = BoardComplexityAnalyzer()
+    results = []
+    
+    boards_dir = test_dir / "boards"
+    if boards_dir.exists():
+        snapshot_files = sorted(boards_dir.glob("move_*.txt"))
+        
+        for snapshot in snapshot_files:
+            # Extract move number from filename
+            move_num = int(snapshot.stem.split('_')[1])
+            
+            board_values = parse_board_from_snapshot(str(snapshot))
+            if board_values:
+                board = [[board_values[i*4 + j] for j in range(4)] 
+                        for i in range(4)]
+                
+                analysis = analyzer.analyze_board(board)
+                analysis['move_number'] = move_num
+                analysis['source'] = 'snapshot'
+                results.append(analysis)
+    
+    return pd.DataFrame(results)
+
+def main():
+    """Analyze all game logs in the logs directory."""
+    logs_dir = Path("exp_030/logs")
+    
+    if not logs_dir.exists():
+        print(f"Creating {logs_dir} directory...")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find all test directories
+    test_dirs = [d for d in logs_dir.iterdir() if d.is_dir()]
+    
+    print(f"Found {len(test_dirs)} test directories to analyze")
+    
+    all_results = []
+    for test_dir in test_dirs:
+        print(f"Analyzing {test_dir.name}...")
+        
+        # Analyze move logs
+        moves_log = test_dir / "moves.log"
+        if moves_log.exists():
+            try:
+                df = analyze_log_file(str(moves_log))
+                if not df.empty:
+                    df['test_id'] = test_dir.name
+                    all_results.append(df)
+            except Exception as e:
+                print(f"Error analyzing moves log: {e}")
+        
+        # Analyze snapshots
+        try:
+            snapshots_df = analyze_snapshots(test_dir)
+            if not snapshots_df.empty:
+                snapshots_df['test_id'] = test_dir.name
+                all_results.append(snapshots_df)
+                
+                # Create visualization
+                viz_path = test_dir / "complexity_analysis.png"
+                visualize_complexity_evolution(snapshots_df, str(viz_path))
+        except Exception as e:
+            print(f"Error analyzing snapshots: {e}")
+    
+    # Combine all results
+    if all_results:
+        combined_df = pd.concat(all_results, ignore_index=True)
+        combined_df.to_csv("exp_030/all_games_complexity.csv", index=False)
+        print(f"Saved combined analysis to exp_030/all_games_complexity.csv")
+        
+        # Summary statistics
+        print("\n=== Complexity Statistics Across All Games ===")
+        print(combined_df.groupby('classification')['move_number'].count())
+
+if __name__ == "__main__":
+    main()
+#+end_src
+
+*** Test with Sample Boards
+#+begin_src bash :tangle exp_030/scripts/test_complexity.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test complexity calculation with sample boards
+
+echo "=== Testing Board Complexity Calculator ==="
+
+# Early game board (low complexity)
+echo -e "\n1. Early game board:"
+python exp_030/scripts/board_complexity.py 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2
+
+# Mid-game board (medium complexity)
+echo -e "\n2. Mid-game board:"
+python exp_030/scripts/board_complexity.py 2 4 8 16 32 64 128 2 4 8 16 32 64 128 256 512
+
+# Late game board (high complexity)
+echo -e "\n3. Late game board:"
+python exp_030/scripts/board_complexity.py 512 256 128 64 256 128 64 32 128 64 32 16 64 32 16 8
+
+# Nearly locked board (critical complexity)
+echo -e "\n4. Nearly locked board:"
+python exp_030/scripts/board_complexity.py 512 256 512 256 256 512 256 512 512 256 512 256 256 512 256 128
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Complexity metrics* should differentiate board states effectively
+2. *Early game*: High free tiles, low entropy, high complexity score
+3. *Mid game*: Balanced metrics, medium complexity
+4. *Late game*: Low free tiles, high entropy, low complexity score
+5. *Critical boards*: Very low merge potential, minimal free space
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** CURRENT STATUS
+
+This experiment is IN-PROGRESS. The complexity calculator is implemented but needs:
+1. Validation against real game data
+2. Weight tuning for optimal discrimination
+3. Integration with game logs
+4. Performance benchmarking
+
+** LESSONS LEARNED
+
+1. *Multiple metrics needed*: No single metric captures full complexity
+2. *Normalization critical*: Raw values have different scales
+3. *Context matters*: Same score means different things at different stages
+4. *Visualization helps*: Seeing evolution reveals patterns
+
+** NEXT STEPS
+
+1. Move all logs/ content to exp_030/logs/
+2. Run analysis on historical games
+3. Tune weights based on correlation with game outcomes
+4. Create real-time complexity monitor
+5. Integrate with AI decision making
+
+** RELATED EXPERIMENTS
+- [[file:exp_008_statistical_validation.org][Experiment #008]]: Statistical validation of strategies
+- [[file:exp_011_timing_curve_analysis.org][Experiment #011]]: Board locking analysis
+- [[file:exp_012_claude_plays_2048.org][Experiment #012]]: AI player development
