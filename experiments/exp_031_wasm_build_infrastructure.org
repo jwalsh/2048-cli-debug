@@ -1,0 +1,452 @@
+#+TITLE: Experiment #031: WASM Build Infrastructure
+#+DATE: [2025-06-25]
+#+STATUS: PLANNED
+
+* EXPERIMENT #031: WASM Build Infrastructure
+:PROPERTIES:
+:ID: exp-031-wasm-build-infrastructure
+:HYPOTHESIS: 2048-cli can be compiled to WebAssembly for browser play
+:STATUS: PLANNED
+:ISSUE: [[https://github.com/jwalsh/2048-cli-debug/issues/2][GitHub Issue #2]]
+:END:
+
+** HYPOTHESIS
+We can establish a WASM build infrastructure that:
+1. Compiles the C code to WebAssembly using Emscripten
+2. Provides browser-compatible input/output handling
+3. Maintains game functionality in the browser
+4. Enables debugging in browser DevTools
+
+** RATIONALE
+Building to WASM would:
+- Enable browser-based experimentation
+- Provide new debugging capabilities (browser DevTools)
+- Allow sharing game states via URLs
+- Open possibilities for web-based AI training
+- Create foundation for visual debugging tools
+
+** METHOD
+
+*** Prerequisites Check
+#+begin_src bash :tangle exp_031/scripts/check_prerequisites.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Check for required WASM build tools
+
+echo "=== Checking WASM Build Prerequisites ==="
+
+# Check for Emscripten
+if command -v emcc &> /dev/null; then
+    echo "✅ Emscripten found: $(emcc --version | head -1)"
+else
+    echo "❌ Emscripten not found"
+    echo "   Install with: git clone https://github.com/emscripten-core/emsdk.git"
+    echo "   cd emsdk && ./emsdk install latest && ./emsdk activate latest"
+    exit 1
+fi
+
+# Check for Python (required by Emscripten)
+if command -v python3 &> /dev/null; then
+    echo "✅ Python3 found: $(python3 --version)"
+else
+    echo "❌ Python3 not found"
+    exit 1
+fi
+
+# Check for web server (for testing)
+if command -v python3 -m http.server &> /dev/null; then
+    echo "✅ Python http.server available"
+elif command -v npx http-server &> /dev/null; then
+    echo "✅ npx http-server available"
+else
+    echo "⚠️  No simple web server found (optional)"
+fi
+
+echo -e "\n=== Build Environment Ready ==="
+#+end_src
+
+*** Basic WASM Build Test
+#+begin_src bash :tangle exp_031/scripts/test_wasm_hello.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test basic WASM compilation with hello world
+
+mkdir -p exp_031/wasm_test
+cd exp_031/wasm_test
+
+# Create simple test program
+cat > hello.c << 'EOF'
+#include <stdio.h>
+#include <emscripten.h>
+
+EMSCRIPTEN_KEEPALIVE
+int main() {
+    printf("Hello from WASM 2048!\n");
+    return 0;
+}
+EOF
+
+# Compile to WASM
+echo "Compiling hello.c to WASM..."
+emcc hello.c -o hello.html -s WASM=1
+
+# Check output
+if [ -f "hello.wasm" ] && [ -f "hello.js" ] && [ -f "hello.html" ]; then
+    echo "✅ WASM compilation successful!"
+    echo "   Files created: hello.wasm, hello.js, hello.html"
+    echo "   Run with: python3 -m http.server 8000"
+else
+    echo "❌ WASM compilation failed"
+    exit 1
+fi
+#+end_src
+
+*** Analyze 2048 Source Structure
+#+begin_src bash :tangle exp_031/scripts/analyze_source.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Analyze 2048 source for WASM compatibility
+
+SRC_DIR="../../2048-cli-0.9.1/src"
+echo "=== Analyzing 2048 Source for WASM Compatibility ==="
+
+# Check for terminal-specific code
+echo -e "\n1. Terminal/platform-specific files:"
+find $SRC_DIR -name "*.c" -exec grep -l "termios\|ncurses\|SDL" {} \; | sort
+
+# Check for file I/O
+echo -e "\n2. File I/O operations:"
+grep -n "fopen\|fwrite\|fread" $SRC_DIR/*.c || echo "   No direct file I/O found"
+
+# Check for system calls
+echo -e "\n3. System calls:"
+grep -n "system(\|fork(\|exec" $SRC_DIR/*.c || echo "   No problematic system calls found"
+
+# List graphics backends
+echo -e "\n4. Graphics backends:"
+ls -1 $SRC_DIR/gfx_*.c
+
+# Check main game logic files
+echo -e "\n5. Core game files (should be portable):"
+ls -1 $SRC_DIR/{engine,ai,merge_std,options}.c 2>/dev/null || echo "   Pattern not found"
+#+end_src
+
+*** WASM-specific Graphics Backend
+#+begin_src c :tangle exp_031/src/gfx_web.c :mkdirp yes
+/* gfx_web.c - Web/WASM graphics backend for 2048 */
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "gfx.h"
+#include "engine.h"
+
+struct gfx_state {
+    int dummy; /* WASM doesn't need terminal state */
+};
+
+/* JavaScript interface for rendering */
+EM_JS(void, js_draw_board, (int size, int* values, int score), {
+    // This will be called from C to update the web display
+    if (window.draw2048Board) {
+        const board = [];
+        for (let i = 0; i < size * size; i++) {
+            board.push(HEAP32[values/4 + i]);
+        }
+        window.draw2048Board(board, score);
+    }
+});
+
+/* JavaScript interface for getting input */
+EM_JS(int, js_get_input, (), {
+    if (window.lastKeyPressed) {
+        const key = window.lastKeyPressed;
+        window.lastKeyPressed = null;
+        return key;
+    }
+    return -1;
+});
+
+struct gfx_state* gfx_init(struct gamestate *g) {
+    struct gfx_state *s = malloc(sizeof(struct gfx_state));
+    printf("Web graphics initialized\n");
+    
+    /* Setup will be done in JavaScript */
+    EM_ASM({
+        console.log("2048 WASM: Graphics initialized");
+        window.lastKeyPressed = null;
+        
+        // Setup keyboard listeners
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'w': case 'ArrowUp':    window.lastKeyPressed = 119; break; // 'w'
+                case 's': case 'ArrowDown':  window.lastKeyPressed = 115; break; // 's'
+                case 'a': case 'ArrowLeft':  window.lastKeyPressed = 97;  break; // 'a'
+                case 'd': case 'ArrowRight': window.lastKeyPressed = 100; break; // 'd'
+                case 'q': window.lastKeyPressed = 113; break; // 'q' for quit
+            }
+            e.preventDefault();
+        });
+    });
+    
+    return s;
+}
+
+void gfx_draw(struct gfx_state *s, struct gamestate *g) {
+    /* Pass board state to JavaScript */
+    js_draw_board(g->opts->grid_height, g->grid_data_ptr, g->score);
+}
+
+int gfx_getch(struct gfx_state *s) {
+    /* Non-blocking input check */
+    int key = js_get_input();
+    if (key == -1) {
+        emscripten_sleep(50); /* Small delay to not spin CPU */
+    }
+    return key;
+}
+
+void gfx_sleep(int ms) {
+    emscripten_sleep(ms);
+}
+
+void gfx_destroy(struct gfx_state *s) {
+    free(s);
+}
+#+end_src
+
+*** HTML Interface
+#+begin_src html :tangle exp_031/web/index.html :mkdirp yes
+<!DOCTYPE html>
+<html>
+<head>
+    <title>2048 WASM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #faf8ef;
+        }
+        #game-container {
+            margin: 20px auto;
+            width: 500px;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            grid-gap: 10px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #bbada0;
+            border-radius: 6px;
+            width: fit-content;
+        }
+        .tile {
+            width: 100px;
+            height: 100px;
+            background-color: #cdc1b4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 35px;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+        .tile-2 { background-color: #eee4da; color: #776e65; }
+        .tile-4 { background-color: #ede0c8; color: #776e65; }
+        .tile-8 { background-color: #f2b179; color: #f9f6f2; }
+        .tile-16 { background-color: #f59563; color: #f9f6f2; }
+        .tile-32 { background-color: #f67c5f; color: #f9f6f2; }
+        .tile-64 { background-color: #f65e3b; color: #f9f6f2; }
+        .tile-128 { background-color: #edcf72; color: #f9f6f2; font-size: 30px; }
+        .tile-256 { background-color: #edcc61; color: #f9f6f2; font-size: 30px; }
+        .tile-512 { background-color: #edc850; color: #f9f6f2; font-size: 30px; }
+        .tile-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 25px; }
+        .tile-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 25px; }
+        #console {
+            background: #333;
+            color: #0f0;
+            padding: 10px;
+            margin: 20px auto;
+            width: 480px;
+            height: 200px;
+            overflow-y: scroll;
+            text-align: left;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>2048 WASM</h1>
+        <div id="score">Score: 0</div>
+        <div id="board"></div>
+        <p>Use WASD or Arrow keys to play. Press Q to quit.</p>
+        <div id="console"></div>
+    </div>
+
+    <script>
+        // Console output redirect
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            consoleDiv.innerHTML += args.join(' ') + '<br>';
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        // Board rendering function
+        window.draw2048Board = function(values, score) {
+            const board = document.getElementById('board');
+            const scoreDiv = document.getElementById('score');
+            
+            scoreDiv.textContent = `Score: ${score}`;
+            board.innerHTML = '';
+            
+            for (let i = 0; i < 16; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                
+                if (values[i] > 0) {
+                    const value = Math.pow(2, values[i]);
+                    tile.textContent = value;
+                    tile.className += ` tile-${value}`;
+                }
+                
+                board.appendChild(tile);
+            }
+        };
+
+        // Module configuration
+        var Module = {
+            preRun: [],
+            postRun: [],
+            print: (text) => console.log(text),
+            printErr: (text) => console.error(text),
+            onRuntimeInitialized: function() {
+                console.log('2048 WASM loaded and ready!');
+            }
+        };
+    </script>
+    <script async type="text/javascript" src="2048.js"></script>
+</body>
+</html>
+#+end_src
+
+*** Build Script for WASM
+#+begin_src bash :tangle exp_031/scripts/build_wasm.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Build 2048 for WebAssembly
+
+set -e
+
+# Paths
+SRC_DIR="../../2048-cli-0.9.1/src"
+BUILD_DIR="exp_031/build"
+WEB_DIR="exp_031/web"
+
+# Create build directory
+mkdir -p $BUILD_DIR
+cd $BUILD_DIR
+
+# Source files (excluding incompatible graphics backends)
+SOURCES="
+    $SRC_DIR/engine.c
+    $SRC_DIR/ai.c
+    $SRC_DIR/merge_std.c
+    $SRC_DIR/options.c
+    $SRC_DIR/highscore.c
+    $SRC_DIR/main.c
+    ../src/gfx_web.c
+"
+
+# Compile flags
+CFLAGS="-O2 -s WASM=1 -s ALLOW_MEMORY_GROWTH=1"
+CFLAGS="$CFLAGS -s EXPORTED_FUNCTIONS='[\"_main\"]'"
+CFLAGS="$CFLAGS -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\"]'"
+CFLAGS="$CFLAGS -s ASYNCIFY" # For emscripten_sleep
+CFLAGS="$CFLAGS -I$SRC_DIR"
+CFLAGS="$CFLAGS -DNO_SAVE" # Disable file-based highscore
+
+echo "Building 2048 WASM..."
+emcc $SOURCES -o 2048.js $CFLAGS
+
+# Copy to web directory
+cp 2048.js 2048.wasm ../../$WEB_DIR/
+
+echo "✅ Build complete!"
+echo "   Output: $WEB_DIR/2048.js, $WEB_DIR/2048.wasm"
+echo ""
+echo "To test:"
+echo "   cd $WEB_DIR"
+echo "   python3 -m http.server 8000"
+echo "   Open http://localhost:8000"
+#+end_src
+
+*** Testing Script
+#+begin_src bash :tangle exp_031/scripts/test_wasm_build.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test the WASM build
+
+# First check prerequisites
+./exp_031/scripts/check_prerequisites.sh || exit 1
+
+# Run basic WASM test
+echo -e "\n=== Running Basic WASM Test ==="
+./exp_031/scripts/test_wasm_hello.sh || exit 1
+
+# Analyze source
+echo -e "\n=== Analyzing Source Compatibility ==="
+./exp_031/scripts/analyze_source.sh
+
+# Attempt full build
+echo -e "\n=== Building 2048 WASM ==="
+./exp_031/scripts/build_wasm.sh
+
+# If successful, start server
+if [ -f "exp_031/web/2048.wasm" ]; then
+    echo -e "\n=== Starting Web Server ==="
+    echo "Navigate to http://localhost:8000"
+    cd exp_031/web
+    python3 -m http.server 8000
+fi
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Build Success*: Clean compilation to WASM without errors
+2. *File Generation*: 2048.js, 2048.wasm, and index.html created
+3. *Browser Loading*: Game loads in modern browsers
+4. *Input Handling*: Keyboard controls work (WASD/arrows)
+5. *Display*: Board renders correctly with tile values
+6. *Performance*: Playable speed (< 100ms response time)
+
+** POTENTIAL ISSUES
+
+1. *Graphics Backend*: Need web-specific implementation
+2. *File I/O*: Highscore saving needs localStorage
+3. *Terminal Code*: All termios/ncurses code must be excluded
+4. *Memory Layout*: Ensure same grid[col][row] behavior
+5. *Build Complexity*: Multiple source files need coordination
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** DEBUGGING APPROACHES
+
+1. *Browser Console*: Use for JavaScript/WASM errors
+2. *Source Maps*: Enable with `-g` flag for debugging
+3. *Memory Inspector*: Browser DevTools for heap analysis
+4. *Performance Profiler*: Check for bottlenecks
+5. *Network Tab*: Verify WASM loading
+
+** NEXT STEPS
+
+1. Install Emscripten if not present
+2. Create minimal gfx_web.c implementation
+3. Test basic compilation
+4. Iteratively add features
+5. Optimize for size and performance
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: Memory layout understanding
+- [[file:exp_007_memory_layout_proof.org][Experiment #007]]: Grid indexing knowledge
+- Future: WASM-based debugging tools

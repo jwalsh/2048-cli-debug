@@ -1,335 +1,258 @@
-#+TITLE: 2048 CLI Architecture
-#+AUTHOR: Jason Walsh
+#+TITLE: Debugging Research Architecture
+#+AUTHOR: Claude & jwalsh
 #+DATE: [2025-06-25]
-#+OPTIONS: toc:2
+#+OPTIONS: toc:3
 
 * Overview
 
-The 2048 CLI game is built with a modular architecture that separates game logic, rendering, and user input. This document describes the system design, memory layout, and debugging infrastructure.
+This document describes the architecture of our debugging research methodology applied to the 2048-cli project. Rather than the game's architecture (see [[file:2048-cli-technical-guide.org][2048-CLI Technical Guide]]), this focuses on our experimental framework and research approach.
 
-* System Architecture
+* Research Philosophy
 
-#+BEGIN_SRC ditaa :file architecture.png :cmdline -E
-┌─────────────────┐     ┌──────────────┐     ┌─────────────┐
-│   User Input    │────▶│  Game Engine │────▶│   Display   │
-│  (keyboard/AI)  │     │   (engine.c) │     │  (gfx_*.c)  │
-└─────────────────┘     └──────────────┘     └─────────────┘
-         │                      │                     │
-         │                      ▼                     │
-         │              ┌──────────────┐             │
-         └─────────────▶│  Game State  │◀────────────┘
-                        │ (gamestate)  │
-                        └──────────────┘
-#+END_SRC
+** Scientific Approach
+- Every investigation becomes a numbered experiment
+- Hypotheses are clearly stated and testable
+- Methods are reproducible via org-babel tangle
+- Results are documented whether successful or failed
+- Statistical validation where applicable
 
-* Core Components
+** "The Score Doesn't Matter - The Learning Does" 🎮
+Our focus is on understanding program behavior, not game performance.
 
-** Main Loop (~main.c~)
+* Experimental Framework Architecture
 
-The main game loop follows a simple pattern:
+#+begin_src ditaa :file research-architecture.png :cmdline -E
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Hypothesis    │────▶│   Experiment     │────▶│    Results      │
+│   Formation     │     │   Execution      │     │   Analysis      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+         │                        │                        │
+         │                        ▼                        │
+         │              ┌──────────────────┐               │
+         └─────────────▶│  Documentation   │◀──────────────┘
+                        │   (org-mode)     │
+                        └──────────────────┘
+#+end_src
 
-#+BEGIN_SRC c
-while (game_running) {
-    if (g->opts->interactive) {
-        input = gfx_getch(s);    // Get user input
-    } else if (g->opts->ai) {
-        input = ai_move(g);      // Get AI decision
-    }
-    
-    engine_tick(g, s, input);    // Update game state
-    
-    if (g->opts->interactive) {
-        gfx_draw(s, g);          // Render display
-    }
-}
-#+END_SRC
+** Core Components
 
-** Game State (~engine.h~)
+*** 1. Experiment Template System
+- Standardized structure for all investigations
+- Consistent metadata and property drawers
+- Reproducible via org-babel tangle
+- Cross-referencing between related experiments
 
-The central data structure that holds all game information:
+*** 2. Literate Programming Approach
+- Code and documentation intertwined
+- Scripts generated from experiment descriptions
+- Version controlled alongside findings
+- Enables exact reproduction
 
-#+BEGIN_SRC c
-struct gamestate {
-    // Board data
-    int *grid_data_ptr;      // 1D array of tile values
-    int **grid;              // 2D pointer array for column access
-    int gridsize;            // Total number of cells
-    
-    // Game status
-    int moved;               // Flag: did last action cause movement?
-    long score;              // Current score
-    long score_high;         // Highest score achieved
-    long score_last;         // Previous score (for display)
-    int blocks_in_play;      // Number of non-zero tiles
-    
-    // Configuration
-    struct gameoptions *opts;
-    int print_width;         // Width for number formatting
-};
-#+END_SRC
+*** 3. Tool Integration
+Multiple debugging tools working together:
+- LLDB for memory inspection
+- tmux for TTY automation
+- Python for data analysis
+- Emacs for development environment
 
-** Memory Layout
+* Research Methodology Layers
 
-The game uses an efficient dual-array system for the board:
+** Layer 1: Tool Exploration (Experiments 001-006)
+Initial exploration of available tools and their reliability.
 
-#+BEGIN_EXAMPLE
-Memory Layout Example (4x4 grid):
+#+begin_example
+TTY Control → Process Management → Memory Inspection
+#+end_example
 
-grid_data_ptr (contiguous memory):
-[2][0][4][8][0][2][0][0][16][32][0][0][4][0][0][2]
- 0  1  2  3  4  5  6  7   8   9 10 11 12 13 14 15
+** Layer 2: Systematic Investigation (Experiments 007-011)
+Rigorous hypothesis testing with statistical validation.
 
-grid (column pointers) - CRITICAL DISCOVERY:
-grid[0] → &grid_data_ptr[0,4,8,12]  → Column 0
-grid[1] → &grid_data_ptr[1,5,9,13]  → Column 1
-grid[2] → &grid_data_ptr[2,6,10,14] → Column 2
-grid[3] → &grid_data_ptr[3,7,11,15] → Column 3
-#+END_EXAMPLE
+#+begin_example
+Memory Layout → Statistical Analysis → Timing Behavior
+#+end_example
 
-*IMPORTANT*: The grid uses ~grid[col][row]~ indexing, not ~grid[row][col]~!
-- To access UI position [r][c], use: ~grid[c][r]~
-- This was discovered in [[file:experiments/exp_007_memory_layout_proof.org][Experiment #007]]
+** Layer 3: Framework Development (Experiments 012-031)
+Building reusable tools and extending capabilities.
 
-Benefits:
-- Cache-friendly sequential access
-- Easy 2D indexing once you know the convention
-- Single allocation/deallocation
-- Efficient for both row and column operations
+#+begin_example
+AI Integration → Debugging Tools → Complexity Metrics → WASM
+#+end_example
 
-* Game Engine (~engine.c~)
+* Key Architectural Decisions
 
-** Move Processing
+** Experiment Numbering
+- Sequential numbering (001-031+)
+- Immutable once created
+- Cross-references via org-mode links
+- Status tracking (COMPLETED, IN-PROGRESS, PLANNED)
 
-Each move involves three steps:
+** Directory Structure
+#+begin_example
+experiments/
+├── README.org                     # Aggregated overview
+├── EXPERIMENT_TEMPLATE.org         # Template for new experiments
+├── exp_NNN_descriptive_name.org   # Individual experiments
+└── exp_NNN/                       # Generated artifacts
+    ├── scripts/                   # Tangled from org-mode
+    ├── data/                      # Raw experimental data
+    └── results/                   # Analysis outputs
+#+end_example
 
-1. *Gravitate*: Slide all tiles in the move direction
-2. *Merge*: Combine adjacent identical tiles
-3. *Gravitate*: Slide again to fill gaps after merging
+** Tool Promotion Process
+Scripts graduate from experiments to ~scripts/~ directory when they:
+1. Prove stable and reliable
+2. Have clear, documented interfaces
+3. Are useful across multiple experiments
+4. Handle errors gracefully
 
-#+BEGIN_SRC c
-void engine_move(struct gamestate *g, int direction) {
-    gravitate(g, direction);
-    merge(g, direction);
-    gravitate(g, direction);
-}
-#+END_SRC
+** Documentation Standards
+- Org-mode for all documentation
+- Conventional commit messages
+- Co-authorship attribution with Claude
+- Comprehensive cross-referencing
 
-** Direction Encoding
+* Research Discoveries Framework
 
-Directions are encoded as integers:
-- 0: UP (~w~)
-- 1: DOWN (~s~)
-- 2: LEFT (~a~)
-- 3: RIGHT (~d~)
+** Discovery Categories
 
-** Tile Value Encoding
+*** Memory and State
+- Grid indexing: ~grid[col][row]~ not ~grid[row][col]~
+- Memory layout patterns
+- State persistence techniques
 
-- Empty cell: 0
-- Tile values: ~n~ represents ~2^n~
-  - 1 → 2
-  - 2 → 4
-  - 3 → 8
-  - 11 → 2048
+*** Timing and Performance
+- Built-in animation delays
+- Non-linear timing behaviors
+- Performance measurement techniques
 
-* Graphics System
+*** AI and Strategy
+- Score distribution patterns
+- Board complexity metrics
+- Strategic analysis frameworks
 
-The game supports multiple rendering backends:
+*** Debugging Techniques
+- LLDB automation
+- TTY control reliability
+- Process management hygiene
 
-** Terminal (~gfx_terminal.c~)
-- Uses ANSI escape codes
-- VT100 compatible
-- Minimal dependencies
-- ~160ms/move animation delay (discovered in [[file:experiments/exp_009_speed_baseline.org][Experiment #009]])
+** Knowledge Accumulation
+Each experiment builds on previous discoveries:
 
-** Curses (~gfx_curses.c~)
-- NCurses library
-- Better terminal handling
-- Color support
+#+begin_example
+Exp 003 (Memory) → Exp 007 (Layout) → Exp 026 (Persistence)
+Exp 008 (Stats) → Exp 009 (Timing) → Exp 028 (AI Scores)
+#+end_example
 
-** SDL (~gfx_sdl.c~)
-- Graphical window
-- Font rendering
-- Future expansion
-
-* AI System (~ai.c~)
-
-The AI uses the expectimax algorithm:
-
-#+BEGIN_EXAMPLE
-┌─────────────┐
-│ Current State│
-└──────┬──────┘
-       │
-   ┌───▼───┐
-   │Evaluate│ (for each possible move)
-   └───┬───┘
-       │
-┌──────▼──────┐
-│ Expected    │ (probability of tile spawns)
-│   Value     │
-└──────┬──────┘
-       │
-   ┌───▼───┐
-   │ Choose │ (best expected value)
-   └───────┘
-#+END_EXAMPLE
-
-Key metrics:
-- *Monotonicity*: Tiles arranged in increasing order
-- *Smoothness*: Adjacent tiles have similar values
-- *Free tiles*: Number of empty spaces
-- *Max tile value*: Progress toward 2048
-
-* Debug Infrastructure
+* Tool Architecture
 
 ** LLDB Integration
+- Custom commands for board visualization
+- Automated memory inspection
+- State persistence and restoration
+- Integration with experiment workflows
 
-Custom LLDB scripts provide:
+** Python Analysis Framework
+- Board complexity calculations
+- Statistical analysis pipelines
+- Data visualization
+- Historical log analysis
 
-*** Board Visualization
-#+BEGIN_EXAMPLE
-(lldb) board
-[    2     0     4     8 ]
-[    0     2     0     0 ]
-[   16    32     0     0 ]
-[    4     0     0     2 ]
-#+END_EXAMPLE
+** Emacs Development Environment
+- 2048-mode for debugging
+- Org-babel integration
+- Compilation and testing workflows
+- Documentation generation
 
-*** Memory Inspection
-#+BEGIN_SRC lldb
-(lldb) memory read -c 16 -f d g->grid_data_ptr
-(lldb) p g->grid[3][0]  # Column 3, Row 0 (top-right)
-#+END_SRC
+** tmux Automation
+- Reliable TTY interaction
+- Session management
+- Process isolation
+- Experiment reproducibility
 
-*** State Tracking
-- Breakpoints on key functions
-- Watchpoints on score changes
-- Automated state dumps
+* Future Research Directions
 
-** Emacs Integration
+** Placeholder Areas (To Be Developed)
 
-The Emacs mode provides:
+*** Advanced AI Research
+- Multi-agent experimentation
+- Strategy optimization
+- Performance comparison frameworks
+- Real-time decision analysis
 
-#+BEGIN_EXAMPLE
-┌─────────────────┐
-│   Source Code   │
-│   (C files)     │
-└────────┬────────┘
-         │
-    ┌────▼────┐
-    │ 2048-mode│
-    └────┬────┘
-         │
-    ┌────▼────────────┐
-    │ Features:       │
-    │ - Compilation   │
-    │ - Debugging     │
-    │ - Navigation    │
-    │ - Visualization │
-    └─────────────────┘
-#+END_EXAMPLE
+*** Debugging Tool Development
+- Universal debugging patterns
+- Cross-program applicability
+- Automated discovery techniques
+- Visual debugging interfaces
 
-* Performance Considerations
+*** Platform Extensions
+- WASM debugging capabilities
+- Browser-based experimentation
+- Mobile debugging tools
+- Cross-platform validation
 
-** Memory Efficiency
-- Single allocation for board data
-- Minimal pointer chasing
-- Stack-allocated temporary arrays
+*** Statistical Methods
+- Bayesian analysis frameworks
+- Hypothesis testing automation
+- Confidence interval calculations
+- Experimental design optimization
 
-** CPU Efficiency
-- Branch-free tile merging where possible
-- Early exit conditions
-- Efficient random number generation
+* Meta-Architecture Considerations
 
-** Timing Characteristics
-- ~160ms per move (built-in animation delay)
-- Non-linear timing: faster per-move at higher move counts
-- Board locking can cause no-op moves (faster processing)
+** Reproducibility
+- All experiments self-contained
+- Deterministic build processes
+- Version-controlled data
+- Environment documentation
 
-** Optimization Opportunities
-- SIMD operations for parallel tile processing
-- Bitboard representation for faster operations
-- Transposition tables for AI
+** Scalability
+- Template-based expansion
+- Automated experiment running
+- Parallel execution capabilities
+- Result aggregation systems
 
-* Build System
+** Knowledge Transfer
+- Clear documentation standards
+- Agent handoff procedures
+- Discovery preservation
+- Method standardization
 
-The Makefile supports multiple configurations:
+* Research Infrastructure Status
 
-#+BEGIN_SRC makefile
-# Debug build
-CFLAGS = -g -O0 -DDEBUG
+** Currently Implemented
+- ✅ 31 experiments designed
+- ✅ 11 experiments completed
+- ✅ Statistical analysis pipelines
+- ✅ Literate programming workflow
+- ✅ Tool integration framework
 
-# Release build  
-CFLAGS = -O2 -DNDEBUG
+** In Development
+- 🚧 Board complexity metrics
+- 🚧 Memory persistence tools
+- 🚧 WASM build infrastructure
+- 🚧 Core dump restoration
 
-# Sanitizer build
-CFLAGS = -g -fsanitize=address,undefined
-#+END_SRC
-
-* Testing Architecture
-
-** Unit Testing
-- Individual function testing
-- Mock game states
-- Edge case validation
-
-** Integration Testing
-- Full game scenarios
-- AI behavior verification
-- Memory leak detection
-
-** Experimental Framework
-- [[file:experiments/][experiments/]] directory with rigorous methodology
-- Reproducible experiments with org-mode
-- Statistical validation of behaviors
-
-** Debug Scripts
-- Automated gameplay analysis
-- State transition verification
-- Performance profiling
-
-* Future Enhancements
-
-** Planned Features
-1. Network multiplayer support
-2. Replay system for game analysis
-3. Statistics tracking
-4. Custom board sizes and rules
-
-** Architecture Extensions
-1. Plugin system for new algorithms
-2. Scripting interface (Lua/Python)
-3. Web assembly compilation
-4. Mobile platform support
-
-* Security Considerations
-
-** Input Validation
-- Bounds checking on all array access
-- Command line argument validation
-- File path sanitization
-
-** Memory Safety
-- No dynamic format strings
-- Careful pointer arithmetic
-- Proper cleanup on exit
-
-* Key Discoveries
-
-Through our [[file:experiments/README.org][experimental investigations]], we discovered:
-
-1. *Column-major indexing*: ~grid[col][row]~ not ~grid[row][col]~
-2. *Built-in animation delay*: ~160ms per move cannot be bypassed
-3. *Non-linear timing*: Performance improves with more moves
-4. *Board locking*: Down-right spam can create no-op states
-5. *UI/Memory discrepancies*: Display may not match internal state
+** Planned Extensions
+- 📋 Multi-agent AI research
+- 📋 Visual debugging tools
+- 📋 Cross-program applications
+- 📋 Automated discovery systems
 
 * Conclusion
 
-The 2048 CLI architecture prioritizes:
-- *Simplicity*: Clean separation of concerns
-- *Efficiency*: Optimal memory layout and algorithms
-- *Debuggability*: Comprehensive tooling support
-- *Extensibility*: Modular design for easy enhancement
+This research architecture transforms ad-hoc debugging into systematic scientific investigation. The combination of:
 
-This architecture enables both casual play and deep analysis of the 2048 game mechanics.
+- Rigorous experimental methodology
+- Literate programming practices
+- Tool integration frameworks
+- Knowledge accumulation systems
+
+Creates a sustainable approach to understanding complex program behavior.
+
+The architecture is designed to be:
+- *Reproducible*: Any experiment can be re-run
+- *Extensible*: New tools and methods can be integrated
+- *Transferable*: Techniques apply beyond 2048
+- *Collaborative*: Multiple agents can contribute effectively
+
+*Note*: For the 2048 game's internal architecture, see [[file:2048-cli-technical-guide.org][2048-CLI Technical Guide]].

@@ -977,3 +977,48 @@ Porting to mobile platforms would require more significant changes:
 4. Package the application for the target mobile platform
 
 The modular architecture of the game makes these ports feasible, as you could maintain the core game logic while replacing only the platform-specific components.
+
+* 2048-CLI System Architecture (From Research)
+
+Based on our experimental research (see [[file:experiments/README.org][experiments/]]), we have gained deeper insights into the actual architecture:
+
+** Critical Memory Layout Discovery
+
+*IMPORTANT*: The grid uses ~grid[col][row]~ indexing, not ~grid[row][col]~!
+- Discovered in [[file:experiments/exp_007_memory_layout_proof.org][Experiment #007]]
+- To access UI position [r][c], use: ~grid[c][r]~
+
+#+begin_example
+Memory Layout (4x4 grid):
+grid_data_ptr: [2][0][4][8][0][2][0][0][16][32][0][0][4][0][0][2]
+               0  1  2  3  4  5  6  7   8   9 10 11 12 13 14 15
+
+grid (column pointers):
+grid[0] → &grid_data_ptr[0,4,8,12]  → Column 0
+grid[1] → &grid_data_ptr[1,5,9,13]  → Column 1
+grid[2] → &grid_data_ptr[2,6,10,14] → Column 2
+grid[3] → &grid_data_ptr[3,7,11,15] → Column 3
+#+end_example
+
+** Timing Characteristics
+
+From [[file:experiments/exp_009_speed_baseline.org][Experiment #009]] and [[file:experiments/exp_010_timing_validation.org][Experiment #010]]:
+- Built-in ~160ms per move animation delay cannot be bypassed
+- Non-linear timing: Performance improves with more moves (0.141s/move at 150 moves vs 0.162s/move at 40 moves)
+- Board locking can cause no-op moves (faster processing)
+
+** AI Score Distribution
+
+From [[file:experiments/exp_028_ai_score_distribution.org][Experiment #028]]:
+- AI produces uniform distribution 800-1600, NOT normal distribution
+- Mean: ~1207 points, StdDev: ~212 points
+- Each 200-point bin contains ~25% of scores
+
+** Debugging Infrastructure
+
+Our research established comprehensive debugging capabilities:
+- LLDB integration with custom commands
+- Emacs mode with compilation and debugging
+- Experimental framework with 31 experiments
+- Board complexity metrics implementation
+- Memory persistence and core dump restoration
