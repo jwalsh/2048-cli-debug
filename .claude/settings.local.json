@@ -28,7 +28,9 @@
       "Bash(# Manually save the game state\ntmux send-keys -t game2048:lldb \"memory read --outfile score180_grid.bin --binary --count 64 g->grid_data_ptr\" Enter\nsleep 0.5\ntmux send-keys -t game2048:lldb \"process save-core score180_game.core\" Enter)",
       "Bash(emacs:*)",
       "Bash(./exp_009_verify.sh:*)",
-      "Bash(./exp_009_speed_test.sh:*)"
+      "Bash(./exp_009_speed_test.sh:*)",
+      "Bash(./exp_009_deep_run.sh:*)",
+      "Bash(gnuplot:*)"
     ]
   },
   "enableAllProjectMcpServers": false

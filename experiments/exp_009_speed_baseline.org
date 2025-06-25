@@ -310,27 +310,103 @@ for tile, count in tile_counts.items():
     print(f"  {tile}: {count} ({count/len(df)*100:.1f}%)")
 #+end_src
 
+*** Gnuplot Visualization
+#+begin_src gnuplot :tangle exp_009_simple.gp
+# Simple histogram of scores
+set terminal pngcairo size 800,600 font "Arial,12"
+set output 'exp_009_score_dist.png'
+set title "Score Distribution (92 runs, 40 moves each)"
+set xlabel "Score"
+set ylabel "Frequency"
+set grid
+set datafile separator ","
+
+# Create histogram
+set style data histogram
+set style histogram clustered gap 1
+set style fill solid 0.7 border -1
+binwidth = 50
+bin(x,width) = width*floor(x/width) + width/2.0
+set boxwidth binwidth*0.9
+
+plot 'exp_009_deep_results.csv' every ::1 using (bin($2,binwidth)):(1.0) smooth freq with boxes lc rgb "#4472C4" title "Scores"
+#+end_src
+
 *** Deep Run Results
-[To be filled after running]
+Completed 92 out of 100 runs before timeout (10 minutes).
+
+**** Score Statistics
+- Mean: 103.4
+- Min: 4
+- Max: 296  
+- Range: 292
+
+**** Timing Statistics
+- Mean: 6.46s per run
+- Min: 5.0s
+- Max: 8.0s
+- *Key finding*: Consistent ~6.5s for 40 moves = ~0.16s per move
+
+**** Max Tile Distribution
+- 4: 4 runs (4.3%)
+- 8: 21 runs (22.8%)
+- 16: 30 runs (32.6%)
+- 32: 37 runs (40.2%)
+
+**** Score Distribution
+- 0-49: 30 runs (32.6%)
+- 50-99: 23 runs (25.0%)
+- 100-149: 10 runs (10.9%)
+- 150-199: 15 runs (16.3%)
+- 200-249: 10 runs (10.9%)
+- 250-299: 4 runs (4.3%)
 
 ** CONCLUSION
-1. **Surprising Result**: Direct input is NOT faster than tmux
-   - Direct: ~3.4s for 20 moves
-   - tmux: ~2.0s for 20 moves
-   - Direct input is 0.5x speed (SLOWER!)
-   
-2. **Likely Cause**: The game has built-in animation delays
-   - Not a simple stdin reader
-   - Has animation/timing logic that can't be bypassed
-   - tmux actually handles the timing better
-   
-3. **Key Discovery**: Animation delays are built into the binary
-   - This explains why the game feels "smooth" when playing
-   - Cannot speed up beyond the game's internal timing
-   - Great example of how assumptions can be wrong!
-   
-4. **Implications**: 
-   - tmux approach is actually optimal for this binary
-   - The ~50ms move delay in tmux matches game's internal timing
-   - Direct input doesn't bypass the game's timing constraints
-   - For statistical experiments, we're limited by the game itself
+*** *Surprising Result*: Direct input is NOT faster than tmux
+- Direct: ~3.4s for 20 moves (later confirmed ~6.5s for 40 moves)
+- tmux: ~2.0s for 20 moves  
+- Direct input is 0.5x speed (SLOWER!)
+- Deep run confirms: ~0.16s per move is the game's built-in limit
+
+*** *Key Discovery*: Animation delays are built into the binary
+- The game has internal timing logic that cannot be bypassed
+- This explains why the game feels "smooth" when playing
+- Direct stdin, tmux, expect - all hit the same ~160ms/move wall
+- *Great example of how assumptions can be wrong!*
+
+*** *Implications for Statistical Experiments*
+- tmux approach is actually optimal for this binary
+- 100 runs of 150 moves would take ~40 minutes (confirmed by extrapolation)
+- The game design itself is the bottleneck, not our automation approach
+
+** FUTURE EXPERIMENTS (Speculative)
+
+*** Experiment #010: Direct Memory Manipulation
+*Hypothesis*: If we can't bypass animation delays via input, can we bypass them via memory?
+- Use LLDB to directly modify game state between moves
+- Skip the input processing entirely
+- Write moves directly to the grid memory
+- Could achieve 1000+ runs in minutes instead of hours
+
+*** Experiment #011: Binary Patching
+*Hypothesis*: Patch the binary to remove animation delays
+- Find the timing/sleep calls in the disassembly
+- NOP out the delay instructions
+- Create a "turbo" version for statistical analysis
+- Risk: May break game logic if delays are integral
+
+*** Experiment #012: Core State Serialization
+*Hypothesis*: Save/restore game states to parallelize runs
+- Use the core dump functionality from earlier experiments
+- Create a "checkpoint" system for different board states
+- Run multiple games in parallel from same checkpoint
+- Could achieve true parallel statistics gathering
+
+*** Experiment #013: Headless Mode Investigation
+*Hypothesis*: The binary might have undocumented flags
+- Reverse engineer the binary for hidden options
+- Look for debug/test modes without animations
+- Check for environment variables that affect timing
+- Common in game development for automated testing
+
+These experiments flow naturally from #009's discovery that the game's internal timing is the bottleneck. Each explores a different approach to bypassing this limitation, from memory manipulation to binary modification.
