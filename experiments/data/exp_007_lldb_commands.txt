@@ -1,0 +1,10 @@
+# Commands that led to the discovery
+frame select 7
+p g->grid[0][3]  # Expected 1, got 0
+p g->grid[3][0]  # Expected 0, got 1 - AHA MOMENT!
+p g->grid[2][2]  # Got 1 as expected
+p g->grid[3][3]  # Got 1 as expected
+
+# Memory examination
+memory read -f d -c 16 g->grid_data_ptr
+x/16dw g->grid_data_ptr

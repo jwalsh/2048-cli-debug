@@ -1,0 +1,19 @@
+# Environment for Experiment #007
+experiment:
+  id: exp-007-memory-layout-proof
+  date: 2025-06-25
+  
+environment:
+  os: macOS 14.5
+  arch: arm64 (Apple Silicon)
+  compiler: Apple clang 15.0.0
+  debugger: lldb-1500.0.22.8
+  
+build:
+  flags: "-g -O0"
+  target: "2048-debug"
+  
+dependencies:
+  - tmux 3.4
+  - expect 5.45
+  - python 3.12

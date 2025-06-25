@@ -30,7 +30,8 @@
       "Bash(./exp_009_verify.sh:*)",
       "Bash(./exp_009_speed_test.sh:*)",
       "Bash(./exp_009_deep_run.sh:*)",
-      "Bash(gnuplot:*)"
+      "Bash(gnuplot:*)",
+      "Bash(gh issue view:*)"
     ]
   },
   "enableAllProjectMcpServers": false

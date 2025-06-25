@@ -1,0 +1,16 @@
+# Memory dump at moment of discovery
+# LLDB: memory read -f d -c 16 g->grid_data_ptr
+
+(lldb) memory read -f d -c 16 g->grid_data_ptr
+0x100003f60: 0 0 0 0
+0x100003f70: 0 0 0 0
+0x100003f80: 0 0 1 0
+0x100003f90: 1 0 0 1
+
+# Interpretation:
+# Linear indices: [0] [1] [2] [3] [4] [5] [6] [7] [8] [9] [10] [11] [12] [13] [14] [15]
+# Values:          0   0   0   0   0   0   0   0   0   0   1    0    1    0    0    1
+#
+# UI Position [0][3] = Memory[12] = 1 ✓
+# UI Position [2][2] = Memory[10] = 1 ✓
+# UI Position [3][3] = Memory[15] = 1 ✓
