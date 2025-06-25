@@ -260,9 +260,58 @@ This creates a new paradigm where LLMs can:
 - Transfer debugging knowledge between sessions
 - Build progressively complex understanding
 
+## Progressive Board State Analysis
+
+### Round 2 (After 40 moves)
+- Score: 368
+- Highest tile: 64
+- Unique state ID: `8916100495228`
+- Hex encoding: `0010000002322246`
+- Board configuration:
+  ```
+  |      |      |      |    4 |
+  |      |      |      |    4 |
+  |    2 |      |    4 |   16 |
+  |      |      |    8 |   64 |
+  ```
+
+### Round 3 (After 60 moves)
+- Score: 376 (+8)
+- Highest tile: 64 (no change)
+- Unique state ID: `1284661472966248`
+- Hex encoding: `1001000000230346`
+- Board configuration:
+  ```
+  |    2 |      |      |      |
+  |      |      |      |    8 |
+  |      |      |    4 |   16 |
+  |    2 |      |    8 |   64 |
+  ```
+
+### Key Observations
+1. **Score Growth Slowing**: Only +8 points in 20 moves (vs +288 in first 40)
+2. **Board Congestion**: The 64 tile is blocking merges
+3. **State ID Growth**: The unique identifier jumped by ~1.28 quadrillion
+4. **Pattern Persistence**: Down-right spam maintains corner strategy but efficiency decreases
+
+### State Evolution
+```
+Round 1: Score   0 → State ID: (initial)
+Round 2: Score 368 → State ID: 8,916,100,495,228
+Round 3: Score 376 → State ID: 1,284,661,472,966,248
+```
+
+The exponential growth in state IDs reflects the base-12 encoding where higher-value tiles in later positions create massive numerical jumps.
+
 ## Conclusion
 This LLDB session demonstrated that we can fully understand and control 2048 without modifying its source code. The discovered memory layout and control flow enable sophisticated external manipulation, from save states to AI control, all through debugger interfaces.
 
 The real achievement isn't playing 2048 - it's proving that LLMs can effectively use debuggers to understand and control running programs, opening possibilities for automated debugging, reverse engineering, and program analysis.
+
+We've shown:
+- Real-time memory inspection during gameplay
+- Board state extraction and unique encoding
+- Progressive analysis across multiple rounds
+- Creative state representation methods
 
 Next steps: Implement Python-based LLDB automation for programmatic game control as outlined in issue #6.
