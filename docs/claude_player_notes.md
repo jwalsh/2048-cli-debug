@@ -1,0 +1,55 @@
+# Claude 2048 Player - Implementation Notes
+
+## The Challenge
+Beat the high score of 1708 in 2048 by having Claude take over after an initial "down-right spam" phase.
+
+## Key Insight from User
+"When the board becomes 'complicated' you need to exercise judgement; that's the goal of this"
+
+## Current Status
+- Best spam-only score: 1708 (using down_right_spam.sh)
+- Best Claude-assisted score: 332 (needs improvement!)
+- The spam phase creates complex board states that require strategic thinking
+
+## Approaches Tried
+
+### 1. TTY-based (Current Focus)
+- Direct TTY control via Python's pty module
+- Can read board state and inject moves
+- Successfully runs spam phase and shows board to Claude
+- Challenge: Claude needs to analyze the actual board and make decisions
+
+### 2. Board State Analysis
+When shown a complex board like:
+```
+Score: 332
+|    4 |    2 |    4 |    2 |
+|    2 |   16 |    8 |    4 |
+|    4 |   32 |    4 |    2 |
+|      |    8 |   32 |    8 |
+```
+
+Claude should:
+1. Identify critical issues (two 32s not in corners, only 1 empty cell)
+2. Plan strategic moves (merge the 8s, consolidate 32s)
+3. Execute a sequence that progresses toward higher tiles
+
+### 3. Key Technical Components
+- `tty_reader.py`: Captures game output via pseudo-terminal
+- `board_analyzer.py`: Calculates complexity scores (0-100)
+- `manual_test_runner.py`: Integrates components with GUID logging
+
+## User Guidance
+- "Don't overthink it" - avoid over-engineering
+- Focus on TTY approach for now (not GDB yet)
+- The goal is Claude exercising judgment on complex boards
+- Commit frequently to help future AI agents understand the work
+
+## Next Steps
+1. Improve Claude's ability to analyze shown board states
+2. Create better move sequences for complex positions
+3. Test with longer spam phases to reach higher complexity
+4. Eventually beat 1708 with Claude's strategic play
+
+## Long-term Vision
+While TTY is the minimal case, the eventual goal is debugger integration (GDB) for direct memory inspection and control. But for now, focus on making the TTY approach work well.
