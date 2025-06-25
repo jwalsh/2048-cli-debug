@@ -9,7 +9,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(uv run:*)",
-      "Bash(./claude_actually_plays.sh)"
+      "Bash(./claude_actually_plays.sh)",
+      "Bash(screen:*)",
+      "Bash(cat:*)"
     ]
   },
   "enableAllProjectMcpServers": false
