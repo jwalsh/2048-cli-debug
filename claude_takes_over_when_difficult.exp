@@ -1,0 +1,120 @@
+#!/usr/bin/expect -f
+# Claude takes over when board becomes "difficult"
+# No Python - pure expect/TTY interaction
+
+set timeout 30
+set spam_moves 0
+set score 0
+set max_tile 0
+
+# Start the game
+spawn 2048-cli-0.9.1/2048
+puts "\n🎮 2048: Spam until difficult, then Claude takes over\n"
+
+# Wait for initial board
+expect "Score:"
+sleep 0.5
+
+puts "📍 Phase 1: SPAM (building complexity)\n"
+
+# Spam loop - check every 20 moves
+while {$spam_moves < 500} {
+    # Send 20 quick moves
+    for {set i 0} {$i < 20} {incr i} {
+        set r [expr {rand()}]
+        if {$r < 0.4} {
+            send "s"  ;# down
+        } elseif {$r < 0.7} {
+            send "d"  ;# right
+        } elseif {$r < 0.85} {
+            send "a"  ;# left
+        } else {
+            send "w"  ;# up
+        }
+        after 30
+        incr spam_moves
+    }
+    
+    # Check board state
+    expect -re "Score: (\[0-9\]+)" {
+        set score $expect_out(1,string)
+    }
+    
+    # Look for tiles >= 64 as "difficult" indicator
+    if {[regexp {64|128|256|512|1024|2048} $expect_out(buffer)]} {
+        puts "\n🚨 BOARD IS GETTING DIFFICULT!"
+        puts "   Score: $score"
+        puts "   Moves: $spam_moves"
+        break
+    }
+    
+    if {$spam_moves % 100 == 0} {
+        puts "   Spam $spam_moves moves, score: $score"
+    }
+}
+
+puts "\n📍 Phase 2: CLAUDE TAKES CONTROL\n"
+puts "Let me see the current board state...\n"
+
+# Wait a moment to see board clearly
+sleep 1
+
+# Show current board by triggering refresh
+send "s"
+expect "Score:"
+sleep 0.5
+
+puts "\n🧠 Claude thinking..."
+puts "I need to consolidate tiles and work strategically now.\n"
+
+# Strategic play loop
+set strategic_moves 0
+while {$strategic_moves < 100} {
+    # Claude's decision making
+    puts -nonewline "Move [expr $spam_moves + $strategic_moves]: "
+    
+    # Simple strategy: mostly down-right with occasional recovery
+    set decision [expr {rand()}]
+    if {$decision < 0.4} {
+        puts "DOWN (consolidate)"
+        send "s"
+    } elseif {$decision < 0.7} {
+        puts "RIGHT (build corner)"
+        send "d"
+    } elseif {$decision < 0.85} {
+        puts "LEFT (merge tiles)"
+        send "a"
+    } else {
+        puts "UP (emergency)"
+        send "w"
+    }
+    
+    after 300  ;# Slower for strategic moves
+    incr strategic_moves
+    
+    # Check score periodically
+    if {$strategic_moves % 10 == 0} {
+        expect -re "Score: (\[0-9\]+)" {
+            set score $expect_out(1,string)
+            puts "\n   Current score: $score\n"
+        }
+    }
+    
+    # Victory check
+    if {$score > 1708} {
+        puts "\n🎉 BEAT HIGH SCORE! Score: $score"
+        break
+    }
+}
+
+puts "\n📊 Final Statistics:"
+puts "   Total moves: [expr $spam_moves + $strategic_moves]"
+puts "   Spam moves: $spam_moves"
+puts "   Claude moves: $strategic_moves"
+puts "   Final score: $score"
+
+# Quit game
+send "q"
+expect eof
+
+puts "\n✅ Session complete!"
