@@ -1,0 +1,131 @@
+#+TITLE: Repository Cleanup Status
+#+DATE: [2025-06-25]
+#+AUTHOR: Claude & jwalsh
+
+* Overview
+
+This document summarizes the comprehensive cleanup and reorganization performed on the 2048-cli-debug repository on 2025-06-25.
+
+* Files Removed/Relocated
+
+** Root Directory Cleanup
+| Original File | Action | New Location |
+|---------------+--------+--------------|
+| README.md | Removed | Generated from README.org via ~make README.md~ |
+| main.py | Removed | Not needed |
+| dep.sh | Moved | scripts/deps.sh |
+| board_test.txt | Removed | Test artifacts |
+| complex_board.txt | Removed | Test artifacts |
+| test_board.txt | Removed | Test artifacts |
+| lldb_manual_session.txt | Moved | experiments/exp_029/manual_session_notes.txt |
+| issue_alignment.md | Moved | experiments/exp_005/issue_alignment.md |
+| core_dump_restoration.md | Removed | Content moved to exp_027 |
+| lldb_memory_persistence.md | Removed | Content moved to exp_026 |
+| 2048-cli-technical-guide.md | Removed | Converted to .org format |
+| 2048_debug | Removed | Build artifact |
+| lldb_session_log.md | Removed | Session artifact |
+| logs/ | Moved | experiments/exp_030/logs/ |
+
+** Documentation Conversions
+All markdown files in root converted to org-mode:
+- ARCHITECTURE.md → ARCHITECTURE.org
+- CONTRIBUTING.md → CONTRIBUTING.org
+- README.md → README.org (with auto-generation)
+- 2048-cli-technical-guide.md → 2048-cli-technical-guide.org
+
+* New Experiments Created
+
+** From Existing Content
+- *Experiment #026*: Memory Persistence (from lldb_memory_persistence.md)
+- *Experiment #027*: Core Dump Restoration (from core_dump_restoration.md)
+- *Experiment #029*: LLDB Manual Play Analysis (from lldb_manual_session.txt)
+
+** New Experiments
+- *Experiment #028*: AI Score Distribution Analysis
+- *Experiment #030*: Board Complexity Metrics Implementation
+
+* Current Repository Structure
+
+#+begin_example
+2048-cli-debug/
+├── .claude/                    # Claude configuration
+├── 2048-cli-0.9.1/            # Game source
+├── docs/                      # Documentation
+├── experiments/               # 30 experiments (001-030)
+│   ├── README.org            # Experiments overview
+│   ├── EXPERIMENT_TEMPLATE.org
+│   └── exp_NNN/              # Individual experiments
+├── scripts/                   # Stable scripts
+│   ├── cleanup_2048.sh
+│   └── deps.sh
+├── tty_manual/               # Python TTY control package
+├── .gitignore                # Updated with README.md
+├── ARCHITECTURE.org          # System architecture
+├── CONTRIBUTING.org          # Contribution guide
+├── LICENSE                   # MIT License
+├── Makefile                  # Build system (with deps, README.md targets)
+├── README.org               # Main documentation
+├── pyproject.toml           # Python project config
+└── uv.lock                  # Python dependencies
+#+end_example
+
+* Key Changes to Build System
+
+** Makefile Updates
+1. Added ~make deps~ target to run scripts/deps.sh
+2. Added ~make README.md~ target to generate from README.org
+3. Existing ~make experiments/README.txt~ for ASCII export
+
+** Git Ignore Updates
+- Added README.md (now generated)
+- Existing ignores for build artifacts and experiment outputs
+
+* Experiment Status Summary
+
+** Completed (001-010, 028)
+11 experiments with full results and analysis
+
+** In Progress (026, 027, 030)
+3 experiments with implementation but pending execution
+
+** Planned (011-025, 029)
+15 experiments with hypotheses and methods defined
+
+* Repository Description Update
+
+Updated GitHub description to reflect experimental nature:
+"Scientific exploration of program debugging through 2048-cli. Features 29+ experiments in TTY control, memory inspection, LLDB automation, and AI integration. A journey from simple game hacking to rigorous experimental methodology. The score doesn't matter - the learning does! 🎮🔬"
+
+* Next Steps for Future Agents
+
+1. Execute pending experiments (011, 026, 027, 029, 030)
+2. Complete planned AI experiments (012-016)
+3. Implement LLDB framework experiments (017-020)
+4. Run board analysis experiments (021-025)
+5. Generate experiment reports and findings
+
+* Files Safe to Generate/Remove
+
+** Can be Generated
+- README.md (from README.org)
+- experiments/README.txt (from experiments/README.org)
+- TAGS (via make etags)
+- Build artifacts (2048, 2048_debug)
+
+** Should Not Remove
+- Any .org files
+- Any files in experiments/
+- Scripts in scripts/
+- Source code in 2048-cli-0.9.1/
+- Python package files
+
+* Conventional Commits Used
+
+Following conventional commit format throughout:
+- feat: New features or experiments
+- docs: Documentation updates
+- refactor: Code reorganization
+- chore: Maintenance tasks
+
+With co-authorship attribution:
+~Co-Authored-By: Claude <noreply@anthropic.com>~

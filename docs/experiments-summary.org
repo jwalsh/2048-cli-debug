@@ -1,0 +1,62 @@
+#+TITLE: Experiments Summary and Status
+#+DATE: [2025-06-25]
+#+AUTHOR: Claude & jwalsh
+
+* Quick Reference: All 30 Experiments
+
+** ✅ Completed (11)
+| # | Title | Key Finding |
+|---+-------+-------------|
+| 001 | TTY Control | tmux most reliable for automation |
+| 002 | Down-Right Spam | 1708 high score achieved |
+| 003 | LLDB Memory | Found gamestate structure |
+| 004 | Grid Layout | Assumed row-major (later corrected) |
+| 005 | UI/Memory Alignment | Rendering discrepancies found |
+| 006 | Process Chaos | Process hygiene critical |
+| 007 | Memory Layout Proof | CRITICAL: grid[col][row] not grid[row][col] |
+| 008 | Statistical Validation | Down-right produces predictable distribution |
+| 009 | Speed Baseline | Built-in 160ms/move delay discovered |
+| 010 | Timing Validation | Non-linear timing behavior |
+| 028 | AI Score Distribution | Uniform distribution 800-1600 (not normal!) |
+
+** 🚧 In Progress (3)
+| # | Title | Status |
+|---+-------+--------|
+| 026 | Memory Persistence | Implementation complete, needs testing |
+| 027 | Core Dump Restoration | Implementation complete, needs testing |
+| 030 | Board Complexity Metrics | Implementation complete, has test data |
+
+** 📋 Planned (16)
+| # | Title | Category |
+|---+-------+----------|
+| 011 | Timing Curve Analysis | Game Mechanics |
+| 012-016 | AI Players (5 experiments) | AI Development |
+| 017-020 | LLDB Framework (4 experiments) | Debugging Tools |
+| 021-025 | Board Analysis (5 experiments) | Pattern Analysis |
+| 029 | LLDB Manual Play | Interactive Debug |
+
+* Key Discoveries
+
+1. *Memory Layout*: The grid uses column-major indexing (grid[col][row])
+2. *Timing*: 160ms built-in animation delay cannot be bypassed
+3. *AI Scores*: Uniform distribution, not normal as expected
+4. *Board Locking*: Down-right spam creates predictable locked states
+5. *Process Control*: tmux + expect provides most reliable automation
+
+* Experimental Methodology
+
+Each experiment follows:
+1. Clear hypothesis
+2. Reproducible method (org-babel tangle)
+3. Objective observations
+4. Statistical analysis where applicable
+5. Documented failures and lessons learned
+
+* For Next Agent
+
+Priority experiments to run:
+1. *Exp 030*: Board complexity - has test data ready
+2. *Exp 011*: Timing curves - builds on exp 009-010
+3. *Exp 026-027*: Memory persistence - implementation ready
+
+See [[file:../experiments/README.org][experiments/README.org]] for detailed overview.
