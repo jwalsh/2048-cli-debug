@@ -1,0 +1,174 @@
+#+TITLE: Experiment #017: LLDB Controller Framework
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #017: Automated Game Control via LLDB
+:PROPERTIES:
+:ID: exp-017-lldb-controller
+:HYPOTHESIS: LLDB can provide complete automated control and introspection of 2048
+:END:
+
+** HYPOTHESIS
+Using LLDB's Python API, we can:
+1. Control game execution programmatically
+2. Read game state directly from memory
+3. Inject moves without TTY interaction
+4. Track all state changes in real-time
+5. Build a reusable debugging framework
+
+** RATIONALE
+Direct memory access via LLDB enables:
+- Bypassing UI limitations
+- Perfect state observation
+- Rapid experimentation
+- State manipulation for testing
+- Framework for debugging any program
+
+** METHOD
+*** LLDB Controller Architecture
+#+begin_src python :tangle exp_017/lldb_architecture.py :mkdirp yes
+import lldb
+
+class GameController:
+    """Base class for LLDB game control"""
+    
+    def __init__(self, executable_path):
+        self.debugger = lldb.SBDebugger.Create()
+        self.target = self.debugger.CreateTarget(executable_path)
+        self.process = None
+        self.game_state_addr = None
+        
+    def start_game(self):
+        """Launch game under debugger control"""
+        self.process = self.target.LaunchSimple(None, None, os.getcwd())
+        self.find_game_state()
+        
+    def find_game_state(self):
+        """Locate game state structure in memory"""
+        # Set breakpoint at known location
+        # Extract game state pointer
+        pass
+        
+    def read_board(self):
+        """Read current board state from memory"""
+        if not self.game_state_addr:
+            return None
+            
+        # Read grid array directly
+        error = lldb.SBError()
+        grid_data = self.process.ReadMemory(self.game_state_addr, 64, error)
+        
+        # Convert to 2D array
+        board = []
+        for i in range(4):
+            row = []
+            for j in range(4):
+                idx = i * 4 + j
+                value = int.from_bytes(grid_data[idx*4:(idx+1)*4], 'little')
+                row.append(value)
+            board.append(row)
+            
+        return board
+        
+    def inject_move(self, direction):
+        """Inject move directly into game logic"""
+        # Find move processing function
+        # Call it with appropriate parameters
+        pass
+#+end_src
+
+*** Capabilities to Implement
+1. **State Reading**
+   - Board state
+   - Score
+   - Move count
+   - RNG state
+
+2. **Control Flow**
+   - Breakpoint management
+   - Step execution
+   - Function calls
+
+3. **State Manipulation**
+   - Board modification
+   - Score adjustment
+   - Save/restore states
+
+*** Test Cases
+#+begin_src bash :tangle exp_017/test_lldb_control.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test LLDB controller capabilities
+
+echo "=== Testing LLDB Controller ==="
+
+# Test 1: Basic connection
+python3 << EOF
+from lldb_controller import LLDBController
+controller = LLDBController('./2048-debug')
+controller.setup()
+print("Connection established")
+EOF
+
+# Test 2: Read initial state
+python3 << EOF
+from lldb_controller import LLDBController
+controller = LLDBController('./2048-debug')
+controller.setup()
+controller.start_game()
+board = controller.read_board()
+print(f"Initial board: {board}")
+EOF
+
+# Test 3: Inject moves
+python3 << EOF
+from lldb_controller import LLDBController
+controller = LLDBController('./2048-debug')
+controller.setup()
+controller.start_game()
+for move in ['s', 'd', 's', 'd']:
+    controller.inject_move(move)
+    board = controller.read_board()
+    print(f"After {move}: {board}")
+EOF
+#+end_src
+
+** EXPECTED RESULTS
+1. Successful game launch under debugger
+2. Accurate board state reading
+3. Move injection without TTY
+4. 10x faster than TTY interaction
+5. Complete state tracking
+
+** OBSERVATIONS
+[To be filled during experiment]
+
+** RESULTS
+[To be filled after experiment]
+
+** ANALYSIS
+### Performance Comparison
+- TTY interaction: ~160ms/move
+- LLDB direct: [TBD] ms/move
+- Speedup factor: [TBD]
+
+### Reliability
+- State reading accuracy: [TBD]%
+- Move injection success: [TBD]%
+- Crash rate: [TBD]%
+
+** CONCLUSION
+[To be filled after analysis]
+
+** FUTURE WORK
+1. Extend to other games
+2. Build visualization tools
+3. Create replay system
+4. Implement time-travel debugging
+
+** RELATED EXPERIMENTS
+- [[file:exp_018_debug_spam.org][Experiment #018]]: Spam analysis via LLDB
+- [[file:exp_019_universal_debugger.org][Experiment #019]]: Generalizing to any program
+- [[file:exp_020_save_restore.org][Experiment #020]]: Save/restore workflows
+
+** FILES IN THIS EXPERIMENT
+- ~lldb_controller.py~ - Main controller implementation
+- ~play_with_lldb.py~ - Example usage script

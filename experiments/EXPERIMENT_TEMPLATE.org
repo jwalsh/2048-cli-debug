@@ -184,6 +184,86 @@ command 2
 - [[file:exp_ZZZ.org][Experiment #ZZZ]]: [How it relates]
 - Issue #N: [Related GitHub issue]
 
+* EXPERIMENT TYPE TEMPLATES
+
+** AI Player Experiments (012-016)
+*** Additional Sections for AI Players
+**** Strategy Description
+- Decision algorithm
+- Heuristics used  
+- Learning approach (if any)
+
+**** Performance Metrics
+#+begin_src python :tangle scripts/exp_XXX_metrics.py
+# Track AI performance metrics
+metrics = {
+    'games_played': 0,
+    'scores': [],
+    'max_tiles': [],
+    'move_counts': [],
+    'decision_times': [],
+    'win_rate': 0.0  # games with 2048 tile
+}
+#+end_src
+
+**** Decision Log Format
+| Move # | Board State | Available Moves | Chosen Move | Reasoning |
+|--------+-------------+-----------------+-------------+-----------|
+|      1 | [board]     | w,a,s,d        | d           | [reason]  |
+
+** LLDB/Debugger Experiments (017-020)
+*** Additional Sections for Debugger Work
+**** Breakpoint Specifications
+#+begin_src lldb :tangle scripts/exp_XXX_breakpoints.lldb
+# Key breakpoints for experiment
+b main
+b gamestate_tick
+b gamestate_move
+b process_input
+#+end_src
+
+**** Memory Inspection Points
+- Game state structure location
+- Critical variables to monitor
+- Memory layout documentation
+
+**** State Capture Format
+#+begin_src python :tangle scripts/exp_XXX_state_capture.py
+def capture_state(debugger):
+    """Capture complete game state"""
+    state = {
+        'timestamp': time.time(),
+        'board': read_board(debugger),
+        'score': read_score(debugger),
+        'moves': read_move_count(debugger),
+        'rng_state': read_rng(debugger)
+    }
+    return state
+#+end_src
+
+** Board Analysis Experiments (021-023)
+*** Additional Sections for Board Analysis
+**** Board Representation Format
+- ASCII art representation
+- Data structure format
+- Visualization method
+
+**** Pattern Detection Criteria
+#+begin_src python :tangle scripts/exp_XXX_patterns.py
+patterns = {
+    'monotonic_rows': check_monotonic_rows,
+    'monotonic_cols': check_monotonic_cols,
+    'corner_strategy': check_corner_max,
+    'snake_pattern': check_snake,
+    'edge_filling': check_edge_usage
+}
+#+end_src
+
+**** Statistical Analysis
+- Tile distribution analysis
+- Position heatmaps
+- Merge frequency maps
+
 # === METADATA (Do not edit manually) ===
 # Experiment-Status: PLANNING|IN-PROGRESS|COMPLETE|FAILED
 # Data-Files: exp_XXX_results.csv, exp_XXX_visualization.png

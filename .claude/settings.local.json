@@ -33,7 +33,8 @@
       "Bash(gnuplot:*)",
       "Bash(gh issue view:*)",
       "Bash(mv:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(# exp_012: Basic Claude Player\nmv claude_plays_2048.py claude_just_play.py claude_simple_play.py exp_012/\n\n# exp_013: Strategic Claude Player  \nmv claude_strategic_play.py claude_enhanced_player.py claude_aims_for_2000.exp exp_013/\n\n# exp_014: Interactive Claude Player\nmv claude_interactive.py claude_plays_interactively.py claude_live_analysis.py exp_014/\n\n# exp_015: Claude Takeover Mode\nmv claude_takeover.sh claude_takes_over_when_difficult.exp claude_play_from_existing.py exp_015/\n\n# exp_016: Expect-based Claude Control\nmv claude_plays_with_expect.exp claude_with_expect.exp play_smart.exp exp_016/)"
     ]
   },
   "enableAllProjectMcpServers": false

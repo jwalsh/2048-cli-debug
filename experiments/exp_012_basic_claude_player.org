@@ -1,0 +1,105 @@
+#+TITLE: Experiment #012: Basic Claude Player
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #012: Claude Plays 2048 by Analyzing Board States
+:PROPERTIES:
+:ID: exp-012-basic-claude-player
+:HYPOTHESIS: Claude can successfully play 2048 by analyzing board states and making strategic decisions
+:END:
+
+** HYPOTHESIS
+Claude can play 2048 effectively by:
+1. Reading the current board state via TTY interface
+2. Analyzing tile positions and available moves
+3. Making strategic decisions based on board patterns
+4. Achieving scores comparable to basic human players (>1000)
+5. Learning from game progression without explicit strategy programming
+
+** RATIONALE
+Understanding how an AI assistant interprets and plays 2048 provides insights into:
+- Pattern recognition capabilities
+- Strategic decision-making processes
+- Real-time game state analysis
+- Adaptation to changing board conditions
+
+** METHOD
+*** Implementation Overview
+We have several Claude player implementations:
+1. ~claude_plays_2048.py~ - Main implementation with auto-play followed by manual control
+2. ~claude_just_play.py~ - Simple direct play without automation
+3. ~claude_simple_play.py~ - Minimal implementation
+4. ~claude_one_move.py~ - Single move analysis
+5. ~claude_real_player.py~ - Full game player
+6. ~claude_sends_j.py~ - Specific move testing
+
+*** Core Algorithm
+#+begin_src python :tangle exp_012/claude_player_core.py :mkdirp yes
+from tty_manual.tty_reader import TTYReader
+from tty_manual.board_analyzer import BoardAnalyzer
+
+def claude_analyze_board(board):
+    """Claude's board analysis logic"""
+    # Priority 1: Keep largest tile in corner
+    # Priority 2: Build monotonic rows/columns
+    # Priority 3: Avoid moves that scatter tiles
+    # Priority 4: Maintain open spaces
+    
+    analyzer = BoardAnalyzer()
+    
+    # Determine best move
+    moves = ['w', 'a', 's', 'd']  # up, left, down, right
+    scores = {}
+    
+    for move in moves:
+        # Simulate move and score result
+        score = analyzer.evaluate_move(board, move)
+        scores[move] = score
+    
+    # Return move with highest score
+    return max(scores, key=scores.get)
+#+end_src
+
+*** Test Protocol
+1. Run 10 games with basic Claude player
+2. Record scores, max tiles, and move counts
+3. Analyze decision patterns
+4. Compare with random play baseline
+
+** EXPECTED RESULTS
+1. Average score: 1000-3000
+2. Max tile achievement: 256 (80%), 512 (30%), 1024 (5%)
+3. Average game length: 200-500 moves
+4. Success rate (>1000 score): 70%
+
+** OBSERVATIONS
+[To be filled during experiment]
+
+** RESULTS
+[To be filled after experiment]
+
+** ANALYSIS
+*** Decision Patterns
+- Corner preference: [TBD]
+- Edge utilization: [TBD]
+- Merge strategies: [TBD]
+
+*** Performance Metrics
+- Score distribution: [TBD]
+- Move efficiency: [TBD]
+- Board utilization: [TBD]
+
+** CONCLUSION
+[To be filled after analysis]
+
+** RELATED EXPERIMENTS
+- [[file:exp_013_strategic_claude_player.org][Experiment #013]]: Strategic enhancements
+- [[file:exp_014_interactive_claude_player.org][Experiment #014]]: Interactive play mode
+- [[file:exp_015_claude_takeover.org][Experiment #015]]: Taking over stuck games
+
+** FILES IN THIS EXPERIMENT
+- ~claude_plays_2048.py~ - Main player implementation
+- ~claude_just_play.py~ - Simple player
+- ~claude_simple_play.py~ - Minimal implementation
+- ~claude_one_move.py~ - Single move analyzer
+- ~claude_real_player.py~ - Full game player
+- ~claude_sends_j.py~ - Move testing utility
