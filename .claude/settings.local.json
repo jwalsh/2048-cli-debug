@@ -16,7 +16,8 @@
       "Bash(tmux new-session:*)",
       "Bash(tmux capture-pane:*)",
       "Bash(tmux send-keys:*)",
-      "Bash(clang:*)"
+      "Bash(clang:*)",
+      "Bash(# Save current game state to binary file\ntmux send-keys -t lldb2048 \"memory read --outfile game_quicksave.bin --binary --count 200 g\" Enter)"
     ]
   },
   "enableAllProjectMcpServers": false

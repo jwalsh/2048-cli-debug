@@ -314,4 +314,21 @@ We've shown:
 - Progressive analysis across multiple rounds
 - Creative state representation methods
 
+## Memory Persistence Demonstration
+
+We successfully demonstrated LLDB's ability to save and restore game state:
+
+### Files Created
+- `game_quicksave.bin` (200 bytes) - Complete gamestate structure
+- `grid_only.bin` (64 bytes) - Just the 16 grid values
+- `2048_state_score376.core` (1.1MB) - Full process core dump
+
+### Key Capabilities Proven
+1. **Binary dumps**: `memory read --outfile` saves exact memory regions
+2. **Core dumps**: `process save-core` creates full process snapshots
+3. **Memory restoration**: `memory write --infile` restores saved state
+4. **Process resurrection**: Core files can restart dead processes
+
+This enables save-states, replay systems, and state sharing - all through the debugger without modifying game code!
+
 Next steps: Implement Python-based LLDB automation for programmatic game control as outlined in issue #6.
