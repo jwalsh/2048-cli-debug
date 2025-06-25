@@ -1,0 +1,235 @@
+#+TITLE: Experimental Methodology and Framework
+#+AUTHOR: Claude & jwalsh
+#+DATE: [2025-06-25]
+#+DESCRIPTION: Documentation of the experimental framework that emerged during the 2048 debugging project
+
+* Overview
+
+This document captures the experimental methodology and framework that evolved during our investigation of the 2048 CLI game. What started as informal debugging grew into a rigorous scientific approach with reproducible experiments.
+
+* Key Components That Emerged
+
+** 1. The experiments/ Directory Structure
+
+*** Evolution
+- Started with a monolithic ~experiments.org~ file
+- Realized individual experiments needed their own files
+- Created ~exp_NNN/~ subdirectories for generated artifacts
+- Established numbering scheme (001-025+)
+
+*** Final Structure
+#+begin_example
+experiments/
+├── README.org                    # Overview with #+INCLUDE directives
+├── EXPERIMENT_TEMPLATE.org       # Standard template
+├── exp_001_tty_control.org      # Individual experiment
+├── exp_001/                     # Generated artifacts
+│   ├── scripts/
+│   ├── data/
+│   └── results/
+└── exp_NNN/
+#+end_example
+
+** 2. The Experiment Template
+
+*** Core Sections
+1. *HYPOTHESIS* - Clear, testable statement
+2. *METHOD* - Reproducible steps with ~:tangle~ blocks
+3. *OBSERVATIONS* - Raw findings during execution
+4. *RESULTS* - Processed data and analysis
+5. *CONCLUSION* - Accept/reject hypothesis
+6. *LESSONS LEARNED* - Key insights (especially failures!)
+
+*** Special Templates by Type
+- *AI Player Experiments* (012-016): Performance metrics, decision logs
+- *LLDB Experiments* (017-020): Breakpoints, memory inspection
+- *Board Analysis* (021-023): Pattern detection, visualization
+
+** 3. Org-mode Tangle System
+
+*** Key Discoveries
+1. *Always use ~:mkdirp yes~* when tangling to subdirectories
+2. Run ~org-babel-tangle~ from project root, not experiments/
+3. Use relative paths in tangle targets: ~:tangle exp_NNN/scripts/foo.sh~
+4. Add ~:shebang #!/bin/bash~ for executable scripts
+
+*** Example Tangle Block
+#+begin_src org
+,#+begin_src bash :tangle exp_011/scripts/test.sh :shebang #!/bin/bash :mkdirp yes
+echo "This will create exp_011/scripts/ if needed"
+,#+end_src
+#+end_src
+
+** 4. The Promotion Process
+
+*** Criteria for Promotion
+Scripts move from ~experiments/exp_NNN/~ to ~scripts/~ when they:
+1. Have proven stability through testing
+2. Provide clear, documented interfaces
+3. Are useful across multiple experiments
+4. Handle errors gracefully
+5. Have no experimental dependencies
+
+*** Promotion Example
+~experiments/exp_006/cleanup.sh~ → ~scripts/cleanup_2048.sh~
+- Proved essential after process management chaos
+- Useful for all experiments
+- Clear purpose and interface
+
+** 5. Core Modules
+
+*** tty_manual/ (Stable Package)
+- Emerged from experiments 001-002
+- Provides ~TTYReader~ and ~BoardAnalyzer~ classes
+- Already promoted to root as Python package
+- Clean interface for TTY interaction
+
+*** Candidate Modules
+1. *lldb_controller* (exp_017) - Needs completion
+2. *board_state* - Unified capture/comparison tools
+3. *game_analysis* - Statistical tools from exp_008-010
+
+* Methodological Insights
+
+** 1. Evolution of Rigor
+- Experiments 001-006: Exploratory, informal
+- Experiment 007: First rigorous proof (memory layout)
+- Experiments 008-010: Statistical validation
+- Experiment 011+: Full framework applied
+
+** 2. Importance of Failure Documentation
+- Experiment 006 (Process Chaos) taught critical lessons
+- "lol, such is testing :D" - embracing failures
+- Failed hypotheses (exp_004) led to correct understanding
+
+** 3. Reproducibility Focus
+- Every experiment includes exact commands
+- Environment captured in YAML blocks
+- Raw data preserved in exp_NNN/data/
+- Automated reproduction scripts
+
+** 4. Cross-Experiment Learning
+- tmux reliability (exp_001) → used in all subsequent experiments
+- Memory layout (exp_007) → corrected earlier assumptions
+- Timing discovery (exp_009) → influenced exp_010-011 design
+
+* Technical Patterns
+
+** 1. tmux Session Management
+#+begin_src bash
+# Standard pattern that emerged
+tmux new-session -d -s "exp${NUM}_${PURPOSE}" "command"
+tmux send-keys -t "session" "keys" Enter
+sleep 0.5  # Critical delay!
+tmux capture-pane -t "session" -p > output.txt
+#+end_src
+
+** 2. LLDB Automation
+#+begin_src bash
+# Attach to running process
+lldb -p $(pgrep 2048-debug)
+# Set breakpoints and capture state
+# Memory read patterns for grid inspection
+#+end_src
+
+** 3. Statistical Analysis Pipeline
+1. Bash script generates CSV data
+2. Python/pandas processes results
+3. Matplotlib creates visualizations
+4. Org-mode includes results via ~#+INCLUDE~
+
+* Documentation Standards
+
+** 1. Org-mode Conventions
+- Use ~code~ not `code` (tildes not backticks)
+- Use *bold* not **bold** (single asterisk)
+- Proper property drawers for metadata
+- Custom IDs for cross-references
+
+** 2. Results Presentation
+- Always include visualization at top of file
+- Summary statistics in tables
+- Raw data in exp_NNN/data/
+- Analysis scripts reproducible
+
+** 3. Publishing System
+- ~make experiments/README.txt~ for ASCII export
+- Supports multiple formats (HTML, PDF possible)
+- ~#+INCLUDE~ directives aggregate results
+
+* Workflow Patterns
+
+** 1. Experiment Lifecycle
+1. Create hypothesis in org file
+2. Write method with tangle blocks
+3. Run ~org-babel-tangle~ from project root
+4. Execute experiment (collect data)
+5. Analyze results
+6. Update conclusions
+7. Consider promotion of stable tools
+
+** 2. Mini Pilots
+- Always test with 3-5 runs first
+- Validate approach before full experiment
+- exp_008 showed value when tmux paths failed
+
+** 3. Git Discipline
+- Commit experiments even when failing
+- Use conventional commits
+- Document in commit message what was learned
+- Tag significant discoveries
+
+* Lessons for Future Work
+
+** 1. Start Simple
+- Basic tools (tmux, expect) often suffice
+- Complex frameworks can obscure issues
+- Build complexity incrementally
+
+** 2. Document Everything
+- Process failures are valuable data
+- Screenshot/capture intermediate states
+- Keep raw outputs for reanalysis
+
+** 3. Question Assumptions
+- Grid layout wasn't column-major (exp_004)
+- UI doesn't match memory perfectly (exp_005)
+- Timing isn't linear (exp_010)
+
+** 4. Embrace Iteration
+- Hypotheses will be wrong
+- Experiments will fail
+- Each iteration teaches something
+- "The boring is the learning"
+
+* Future Directions
+
+** 1. Framework Enhancements
+- GitHub Actions for automated experiment runs
+- Formal specifications (TLA+, Lean)
+- Property-based testing
+- Continuous experiment monitoring
+
+** 2. Tool Development
+- Complete LLDB controller framework
+- Build experiment runner CLI
+- Create visualization dashboard
+- Develop state differ tools
+
+** 3. Knowledge Management
+- Auto-generate experiment index
+- Build searchable results database
+- Create experiment dependency graph
+- Generate learning paths
+
+* Conclusion
+
+What began as simple debugging evolved into a sophisticated experimental framework. The combination of:
+- Rigorous methodology
+- Literate programming (org-mode)
+- Version control discipline
+- Willingness to document failures
+
+Created a powerful system for investigating program behavior. This framework can be applied to any software investigation, not just 2048.
+
+The key insight: *treating debugging as scientific experimentation* yields reproducible, valuable results that build on each other.
