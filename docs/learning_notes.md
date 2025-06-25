@@ -1,0 +1,34 @@
+# Learning Notes: The Real Goal
+
+## It's Not About 2048!
+
+The user just clarified the actual goal: **Learn to interact with running programs through their real interfaces**.
+
+2048 is just a convenient test case for learning:
+- TTY attachment and control
+- Real-time state inspection  
+- Making decisions based on current program state
+- Eventually: GDB/LLDB memory inspection
+
+## The Learning Path
+
+1. **Shell scripts** ❌ (timeout, can't maintain session)
+2. **Python TTY abstractions** ❌ (too abstracted, process crashes)
+3. **GNU Screen** ❌ (couldn't capture output properly)
+4. **Expect** ✅ (designed for this exact use case!)
+5. **Next: GDB/LLDB** (direct memory inspection)
+
+## Key Insight
+
+"imagine i said 'create an eshell in emacs' and we would not have a great time"
+
+This perfectly captures it - some tasks require real interaction with the running process, not abstractions or wrappers.
+
+## What Success Looks Like
+
+- Not beating 2048
+- Not reaching score 2000
+- But: Successfully controlling a running program through its actual interface
+- And: Making intelligent decisions based on observed state
+
+The score is just a metric for "are you actually interacting successfully?"
