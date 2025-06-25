@@ -15,7 +15,8 @@
       "Bash(ls:*)",
       "Bash(tmux new-session:*)",
       "Bash(tmux capture-pane:*)",
-      "Bash(tmux send-keys:*)"
+      "Bash(tmux send-keys:*)",
+      "Bash(clang:*)"
     ]
   },
   "enableAllProjectMcpServers": false

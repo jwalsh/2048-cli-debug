@@ -1,0 +1,32 @@
+# LLDB Manual Session for 2048 Debugging
+# Date: 2025-06-25
+# Goal: Learn memory inspection through manual play
+
+# Start LLDB with our debug build
+lldb ./2048-debug
+
+# Set breakpoints at key functions
+breakpoint set -n gamestate_tick
+breakpoint set -n gamestate_new_block
+
+# Run the game
+run
+
+# Commands to use during session:
+# Continue execution: continue (or c)
+# Print game state: print *g
+# Print score: print g->score
+# Print grid size: print g->gridsize
+# Examine grid memory (16 ints for 4x4): memory read -f d -c 16 g->grid_data_ptr
+# Print specific cell: print g->grid[0][0]
+# Backtrace: bt
+# List breakpoints: breakpoint list
+# Delete breakpoint: breakpoint delete 1
+
+# Phase 1: 20 turns of down-right spam
+# Alternate between 's' (down) and 'd' (right)
+# At each breakpoint, inspect memory
+
+# Phase 2: 5 manual strategic moves
+# Analyze board state carefully before each move
+# Document reasoning for each move
