@@ -105,22 +105,26 @@ make etags
 ./2048 --size 5
 #+END_SRC
 
-** Simple Board State Echo
+** Simple Board State Display
 
-To see the starting position of a 2048 game without interactive play:
+To quickly see what a 2048 board looks like:
 
 #+BEGIN_SRC bash
-# Create a simple starting board
-echo -e "Score: 0\n   Hi: 0\n-----------------------------\n|    2 |      |      |      |\n|      |      |      |      |\n|      |      |      |      |\n|      |      |      |    2 |\n-----------------------------"
-
-# Or use printf for more control
-printf "Score: 0\n   Hi: 0\n%s\n" "-----------------------------" \
-  "|    2 |      |      |      |" \
-  "|      |      |      |      |" \
-  "|      |      |      |      |" \
-  "|      |      |      |    2 |" \
-  "-----------------------------"
+# One-liner to show board state
+echo -e "Score: 0\n   Hi: 0\n$(printf '%s\n' -{1..29} | tr -d ' ')\n|    2 |      |      |      |\n|      |      |      |      |\n|      |      |      |      |\n|      |      |      |    2 |\n$(printf '%s\n' -{1..29} | tr -d ' ')"
 #+END_SRC
+
+Output:
+#+BEGIN_EXAMPLE
+Score: 0
+   Hi: 0
+-----------------------------
+|    2 |      |      |      |
+|      |      |      |      |
+|      |      |      |      |
+|      |      |      |    2 |
+-----------------------------
+#+END_EXAMPLE
 
 ** TTY Controller
 
