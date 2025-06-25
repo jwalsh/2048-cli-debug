@@ -1,6 +1,8 @@
 #+TITLE: Experiment #010: Timing Extrapolation Validation
 #+DATE: [2025-06-25]
 
+[[file:exp_010_validation.png]]
+
 * EXPERIMENT #010: Validate Timing Extrapolation with Deep Run
 :PROPERTIES:
 :ID: exp-010-timing-validation
@@ -35,7 +37,7 @@ echo "Hypothesis: 150 moves = ~27.75s per run"
 echo "Total expected time: ~23 minutes"
 echo ""
 echo "Starting at $(date)"
-echo "run,score,time_s,max_tile,moves_per_second" > exp_010_results.csv
+echo "run,score,time_s,max_tile,moves_per_second" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_010_results.csv
 
 # Generate move sequence (150 moves = 75 SD pairs + quit)
 MOVES=""
@@ -63,7 +65,7 @@ for run in {1..50}; do
     MOVES_PER_SEC=$(echo "scale=3; 150 / $TIME_S" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> exp_010_results.csv
+    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_010_results.csv
     
     # Progress with timing prediction
     if (( run % 5 == 0 )); then
@@ -215,10 +217,47 @@ done
 5. Max tiles: 50% reach 128, 20% reach 256
 
 ** OBSERVATIONS
-[To be filled after running]
+- Quick test showed ~22-25s per run (lower than hypothesis)
+- Full experiment completed in 17.6 minutes (faster than expected 23 min)
+- No crashes or timeouts during 50 runs
+- Consistent timing with low variance (std dev 1.19s)
 
 ** RESULTS
-[To be filled after running]
+*** Timing Analysis
+- *Mean time*: 21.12s (hypothesis: 27.75s)
+- *Error*: 23.9% lower than expected
+- *Per-move timing*: 0.141s/move (vs 0.162s/move in exp 009)
+- *Conclusion*: ❌ Non-linear scaling detected
+
+*** Score Distribution
+- Mean: 155.7
+- Median: 74.0 (high variance)
+- Max achieved: 1344 (one exceptional run)
+
+*** Max Tile Distribution
+- ~16~: 38% (most common)
+- ~32~: 30%
+- ~64~: 10%
+- ~128~: 2% (achieved in one run)
 
 ** CONCLUSION
-[To be filled after analysis]
+*** *Key Finding*: Timing is NOT linear with move count
+- 40 moves: ~0.162s/move
+- 150 moves: ~0.141s/move
+- *13% faster per move* at higher move counts
+
+### *Possible Explanations*:
+1. *Game state complexity*: Early moves have more animation/calculation
+2. *Startup overhead*: Initial game setup amortized over more moves
+3. *Board saturation*: Later moves might process faster with fuller board
+
+### *Implications*:
+- Cannot use simple linear extrapolation for timing estimates
+- Need to model timing as a function of move count
+- Future experiments should account for this non-linearity
+- 100 runs of 150 moves would take ~35 minutes, not ~46 as predicted
+
+### *Next Steps*:
+1. Test intermediate move counts (60, 90, 120) to map the curve
+2. Investigate if board density affects timing
+3. Profile the game to understand where time is spent

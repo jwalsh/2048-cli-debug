@@ -38,8 +38,8 @@ The initial mini pilot revealed critical tmux session issues:
 - Sessions failed to attach properly when started with "./2048-debug"
 - Empty score fields in CSV output (e.g., "1,,,pilot_run_1_board.txt,13")
 - Board capture files only contained 1-2 bytes
-- **Key Learning**: tmux requires proper working directory and executable path
-- **Solution**: Need to ensure tmux starts in correct directory with full path to executable
+- *Key Learning*: tmux requires proper working directory and executable path
+- *Solution*: Need to ensure tmux starts in correct directory with full path to executable
 
 ** TIME ESTIMATES
 *** Single Run Breakdown
@@ -305,11 +305,11 @@ cat pilot_results.csv | column -t -s','
 #+end_src
 
 *** Key Changes Made
-1. **Full paths**: Changed from `"./2048-debug"` to `"$GAME_DIR/2048-debug"`
-2. **Working directory**: Added `-c "$GAME_DIR"` to tmux command
-3. **Session verification**: Added check for `tmux has-session`
-4. **Error handling**: Added fallbacks for score/tile extraction
-5. **Debug output**: Added "Starting game session..." messages
+1. *Full paths*: Changed from ~"./2048-debug"~ to ~"$GAME_DIR/2048-debug"~
+2. *Working directory*: Added ~-c "$GAME_DIR"~ to tmux command
+3. *Session verification*: Added check for ~tmux has-session~
+4. *Error handling*: Added fallbacks for score/tile extraction
+5. *Debug output*: Added "Starting game session..." messages
 
 *** Run Instructions
 To execute the mini pilot:
@@ -333,11 +333,11 @@ The first run of mini_pilot.sh revealed critical tmux session management issues:
    - Result: Empty CSV fields (e.g., "1,,,pilot_run_1_board.txt,13")
    - Board files only contained 1-2 bytes (just line numbers from empty capture)
 
-2. **Root Cause**: tmux needs proper context to start executables
+2. *Root Cause*: tmux needs proper context to start executables
    - The relative path "./2048-debug" doesn't work when tmux starts in a different directory
    - tmux capture-pane returns empty when session doesn't exist
 
-3. **Debug Evidence**:
+3. *Debug Evidence*:
    #+begin_example
    $ cat pilot_results.csv
    run,score,max_tile,final_board,timestamp
@@ -346,7 +346,7 @@ The first run of mini_pilot.sh revealed critical tmux session management issues:
    3,,,pilot_run_3_board.txt,13
    #+end_example
 
-4. **Key Learning**: This is an excellent example of silent failures in automation
+4. *Key Learning*: This is an excellent example of silent failures in automation
    - tmux new-session didn't report errors
    - Script continued executing despite no game running
    - Only the empty CSV revealed the problem
@@ -364,18 +364,18 @@ run  score  max_tile  final_board            timestamp
 #+end_example
 
 *** Analysis of Pilot Results
-1. **Score Distribution**: Two runs achieved scores >160, one very low (8)
+1. *Score Distribution*: Two runs achieved scores >160, one very low (8)
    - Mean: 118.7
    - High variance suggests randomness in tile spawning
    
-2. **Max Tiles**: 
+2. *Max Tiles*: 
    - 32: 2 runs (66.7%)
    - 8: 1 run (33.3%)
    - Run 2 got unlucky with tile placement
    
-3. **Timing**: ~13-15 seconds per run (matches our estimate)
+3. *Timing*: ~13-15 seconds per run (matches our estimate)
 
-4. **Board Patterns**: All final boards show characteristic down-right pattern:
+4. *Board Patterns*: All final boards show characteristic down-right pattern:
    - Larger tiles in bottom-right corner
    - Empty spaces in upper-left
    - Clear gradient from top-left to bottom-right
@@ -390,14 +390,14 @@ run  score  max_tile  final_board            timestamp
 ** CONCLUSION
 This experiment demonstrates the importance of mini pilots before full-scale experiments:
 
-1. **Debugging Value**: The initial failure revealed silent tmux session issues that would have wasted 30+ minutes in the full run
+1. *Debugging Value*: The initial failure revealed silent tmux session issues that would have wasted 30+ minutes in the full run
 
-2. **Path Learning**: tmux requires absolute paths and proper working directory setup
+2. *Path Learning*: tmux requires absolute paths and proper working directory setup
    - ❌ `tmux new-session -d -s "name" "./program"`
    - ✅ `tmux new-session -d -s "name" -c "$DIR" "$DIR/program"`
 
-3. **Statistical Preview**: Even 3 runs showed high variance (8-184 score range), validating our need for 100 runs
+3. *Statistical Preview*: Even 3 runs showed high variance (8-184 score range), validating our need for 100 runs
 
-4. **Pattern Confirmation**: Down-right spam creates predictable board patterns with tiles accumulating in bottom-right
+4. *Pattern Confirmation*: Down-right spam creates predictable board patterns with tiles accumulating in bottom-right
 
-5. **Ready for Scale**: With working script and validated timing, we can proceed to full 100-run experiment
+5. *Ready for Scale*: With working script and validated timing, we can proceed to full 100-run experiment

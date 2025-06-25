@@ -1,0 +1,409 @@
+#+TITLE: Experiment #011: Timing Curve Analysis - Understanding Non-Linear Performance
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #011: Map the Timing Curve and Investigate Performance Factors
+:PROPERTIES:
+:ID: exp-011-timing-curve-analysis
+:HYPOTHESIS: Game timing follows a decreasing cost-per-move curve due to startup overhead and board state effects
+:END:
+
+** HYPOTHESIS
+Based on Experiment #010's surprising result (0.141s/move for 150 moves vs 0.162s/move for 40 moves):
+1. Timing per move decreases as total moves increase
+2. The curve will show: ~time = a + b*moves + c*log(moves)~ where ~a~ is startup overhead
+3. Board saturation (more tiles) leads to faster move processing
+4. Early game has more animation/calculation overhead
+5. The timing will plateau after ~100 moves
+
+** RATIONALE
+Understanding the true timing model is crucial for:
+- Accurate experiment planning
+- Identifying performance bottlenecks
+- Optimizing future statistical runs
+- Understanding game internals without source access
+
+** METHOD
+*** Part 1: Map the Timing Curve
+#+begin_src bash :tangle scripts/exp_011_timing_curve.sh :shebang #!/bin/bash
+# Test multiple move counts to map the timing curve
+cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+
+echo "=== Timing Curve Analysis ==="
+echo "moves,run,time_s,score,max_tile" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_timing_curve.csv
+
+# Test points: 10, 20, 40, 60, 80, 100, 120, 150, 200 moves
+MOVE_COUNTS=(10 20 40 60 80 100 120 150 200)
+
+for MOVES in "${MOVE_COUNTS[@]}"; do
+    echo -e "\n=== Testing $MOVES moves (5 runs) ==="
+    
+    # Generate move sequence
+    MOVE_SEQ=""
+    for ((i=1; i<=MOVES/2; i++)); do
+        MOVE_SEQ="${MOVE_SEQ}sd"
+    done
+    # Add single 's' if odd number
+    if (( MOVES % 2 == 1 )); then
+        MOVE_SEQ="${MOVE_SEQ}s"
+    fi
+    MOVE_SEQ="${MOVE_SEQ}q"
+    
+    # Run 5 times for each move count
+    for run in {1..5}; do
+        START=$(date +%s.%N)
+        OUTPUT=$(echo "$MOVE_SEQ" | ./2048-debug 2>&1)
+        END=$(date +%s.%N)
+        
+        TIME_S=$(echo "$END - $START" | bc)
+        SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
+        MAX_TILE=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | sort -nr | head -1)
+        
+        echo "$MOVES,$run,$TIME_S,$SCORE,$MAX_TILE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_timing_curve.csv
+        echo "  Run $run: ${TIME_S}s ($(echo "scale=3; $TIME_S / $MOVES * 1000" | bc)ms/move)"
+    done
+done
+
+echo -e "\n=== Curve mapping complete ==="
+#+end_src
+
+*** Part 2: Profile Game Phases
+#+begin_src bash :tangle scripts/exp_011_phase_analysis.sh :shebang #!/bin/bash
+# Analyze timing of different game phases
+cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+
+echo "=== Game Phase Analysis ==="
+echo "phase,moves,time_s,tiles_on_board,score" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+
+# Function to count tiles in output
+count_tiles() {
+    echo "$1" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' '
+}
+
+# Test early game (first 20 moves)
+echo "Testing early game..."
+EARLY_MOVES="sdsdsdsdsdsdsdsdsdsdq"
+START=$(date +%s.%N)
+OUTPUT=$(echo "$EARLY_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(count_tiles "$OUTPUT")
+SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
+echo "early,20,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+
+# Test mid game (moves 21-60)
+echo "Testing mid game..."
+MID_MOVES=""
+for i in {1..20}; do MID_MOVES="${MID_MOVES}sd"; done
+# Continue from early game state
+CONT_MOVES="sdsdsdsdsdsdsdsdsdsd${MID_MOVES}q"
+START=$(date +%s.%N)
+OUTPUT=$(echo "$CONT_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(count_tiles "$OUTPUT")
+SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
+# Calculate just the mid-game time
+TOTAL_TIME=$TIME_S
+echo "mid,40,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+
+# Test late game (moves 61-100)
+echo "Testing late game..."
+LATE_MOVES=""
+for i in {1..50}; do LATE_MOVES="${LATE_MOVES}sd"; done
+FULL_MOVES="${LATE_MOVES}q"
+START=$(date +%s.%N)
+OUTPUT=$(echo "$FULL_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(count_tiles "$OUTPUT")
+SCORE=$(echo "$OUTPUT" | grep "Score:" | tail -1 | awk '{print $2}')
+echo "late,100,$TIME_S,$TILES,$SCORE" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_phases.csv
+
+echo "=== Phase analysis complete ==="
+#+end_src
+
+*** Part 3: Board Density Impact
+#+begin_src bash :tangle scripts/exp_011_density_test.sh :shebang #!/bin/bash
+# Test if board density affects timing
+cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+
+echo "=== Board Density Impact Test ==="
+echo "strategy,density_estimate,moves,time_s,tiles" > /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+
+# Strategy 1: Corner packing (down-left spam) - high density
+echo "Testing corner packing strategy..."
+CORNER_MOVES=""
+for i in {1..50}; do CORNER_MOVES="${CORNER_MOVES}sa"; done
+CORNER_MOVES="${CORNER_MOVES}q"
+
+START=$(date +%s.%N)
+OUTPUT=$(echo "$CORNER_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
+echo "corner,high,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+
+# Strategy 2: Spread moves (alternating all directions) - low density
+echo "Testing spread strategy..."
+SPREAD_MOVES=""
+for i in {1..25}; do SPREAD_MOVES="${SPREAD_MOVES}wasd"; done
+SPREAD_MOVES="${SPREAD_MOVES}q"
+
+START=$(date +%s.%N)
+OUTPUT=$(echo "$SPREAD_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
+echo "spread,low,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+
+# Strategy 3: Our standard down-right - medium density
+echo "Testing standard strategy..."
+STANDARD_MOVES=""
+for i in {1..50}; do STANDARD_MOVES="${STANDARD_MOVES}sd"; done
+STANDARD_MOVES="${STANDARD_MOVES}q"
+
+START=$(date +%s.%N)
+OUTPUT=$(echo "$STANDARD_MOVES" | ./2048-debug 2>&1)
+END=$(date +%s.%N)
+TIME_S=$(echo "$END - $START" | bc)
+TILES=$(echo "$OUTPUT" | grep -E "^\|" | grep -oE "[0-9]+" | wc -l | tr -d ' ')
+echo "standard,medium,100,$TIME_S,$TILES" >> /Users/jasonwalsh/projects/jwalsh/2048/experiments/exp_011_density.csv
+
+echo "=== Density test complete ==="
+#+end_src
+
+*** Analysis Script
+#+begin_src python :tangle scripts/exp_011_analysis.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.optimize import curve_fit
+import os
+
+# Load data
+base_dir = os.path.dirname(__file__)
+curve_df = pd.read_csv(os.path.join(base_dir, '../exp_011_timing_curve.csv'))
+phases_df = pd.read_csv(os.path.join(base_dir, '../exp_011_phases.csv'))
+density_df = pd.read_csv(os.path.join(base_dir, '../exp_011_density.csv'))
+
+# Aggregate timing curve data
+timing_stats = curve_df.groupby('moves').agg({
+    'time_s': ['mean', 'std'],
+    'score': 'mean'
+}).reset_index()
+timing_stats.columns = ['moves', 'mean_time', 'std_time', 'mean_score']
+timing_stats['ms_per_move'] = timing_stats['mean_time'] / timing_stats['moves'] * 1000
+
+# Define curve fitting functions
+def linear_model(x, a, b):
+    return a + b * x
+
+def log_model(x, a, b, c):
+    return a + b * x + c * np.log(x)
+
+def startup_model(x, startup, per_move):
+    return startup + per_move * x
+
+# Fit models
+moves = timing_stats['moves'].values
+times = timing_stats['mean_time'].values
+
+# Fit different models
+popt_linear, _ = curve_fit(linear_model, moves, times)
+popt_log, _ = curve_fit(log_model, moves, times)
+popt_startup, _ = curve_fit(startup_model, moves, times)
+
+# Create visualization
+fig = plt.figure(figsize=(15, 12))
+
+# 1. Timing curve with fitted models
+ax1 = plt.subplot(2, 2, 1)
+ax1.errorbar(timing_stats['moves'], timing_stats['mean_time'], 
+             yerr=timing_stats['std_time'], fmt='o', label='Measured', capsize=5)
+
+x_fit = np.linspace(10, 200, 100)
+ax1.plot(x_fit, linear_model(x_fit, *popt_linear), '--', label=f'Linear: {popt_linear[0]:.2f} + {popt_linear[1]:.3f}*moves')
+ax1.plot(x_fit, log_model(x_fit, *popt_log), '-', label=f'Log model', linewidth=2)
+ax1.plot(x_fit, startup_model(x_fit, *popt_startup), ':', 
+         label=f'Startup: {popt_startup[0]:.2f}s + {popt_startup[1]:.3f}s/move')
+
+ax1.set_xlabel('Number of Moves')
+ax1.set_ylabel('Total Time (seconds)')
+ax1.set_title('Timing Curve Analysis')
+ax1.legend()
+ax1.grid(True, alpha=0.3)
+
+# 2. Per-move timing
+ax2 = plt.subplot(2, 2, 2)
+ax2.plot(timing_stats['moves'], timing_stats['ms_per_move'], 'o-', markersize=8)
+ax2.axhline(y=160, color='r', linestyle='--', label='Expected 160ms/move')
+ax2.set_xlabel('Number of Moves')
+ax2.set_ylabel('Time per Move (ms)')
+ax2.set_title('Per-Move Timing vs Total Moves')
+ax2.legend()
+ax2.grid(True, alpha=0.3)
+
+# 3. Game phases analysis
+ax3 = plt.subplot(2, 2, 3)
+if len(phases_df) > 0:
+    phases_df['ms_per_move'] = phases_df['time_s'] / phases_df['moves'] * 1000
+    ax3.bar(phases_df['phase'], phases_df['ms_per_move'], color=['green', 'orange', 'red'])
+    ax3.set_ylabel('Time per Move (ms)')
+    ax3.set_title('Timing by Game Phase')
+    
+    # Add tile count as text on bars
+    for i, (phase, tiles) in enumerate(zip(phases_df['phase'], phases_df['tiles_on_board'])):
+        ax3.text(i, phases_df['ms_per_move'].iloc[i] + 5, f'{tiles} tiles', ha='center')
+
+# 4. Board density impact
+ax4 = plt.subplot(2, 2, 4)
+if len(density_df) > 0:
+    density_df['ms_per_move'] = density_df['time_s'] / density_df['moves'] * 1000
+    colors = {'corner': 'darkred', 'spread': 'lightblue', 'standard': 'green'}
+    for strategy in density_df['strategy'].unique():
+        data = density_df[density_df['strategy'] == strategy]
+        ax4.bar(strategy, data['ms_per_move'].values[0], color=colors[strategy])
+        ax4.text(strategy, data['ms_per_move'].values[0] + 2, 
+                f"{data['tiles'].values[0]} tiles", ha='center')
+    ax4.set_ylabel('Time per Move (ms)')
+    ax4.set_title('Board Density Impact on Timing')
+
+plt.tight_layout()
+output_path = os.path.join(base_dir, '../exp_011_analysis.png')
+plt.savefig(output_path, dpi=150, bbox_inches='tight')
+
+# Print analysis results
+print("=== TIMING CURVE ANALYSIS ===")
+print(f"\nLinear model: time = {popt_linear[0]:.2f} + {popt_linear[1]:.3f} * moves")
+print(f"  Startup overhead: {popt_linear[0]:.2f}s")
+print(f"  Per-move cost: {popt_linear[1]*1000:.1f}ms")
+
+print(f"\nStartup model: time = {popt_startup[0]:.2f} + {popt_startup[1]:.3f} * moves")
+print(f"  Fixed startup: {popt_startup[0]:.2f}s")
+print(f"  Consistent per-move: {popt_startup[1]*1000:.1f}ms")
+
+print("\nPer-move timing by move count:")
+for _, row in timing_stats.iterrows():
+    print(f"  {row['moves']} moves: {row['ms_per_move']:.1f}ms/move")
+
+print("\n=== KEY FINDINGS ===")
+startup_effect = (timing_stats.iloc[0]['ms_per_move'] - timing_stats.iloc[-1]['ms_per_move']) / timing_stats.iloc[0]['ms_per_move'] * 100
+print(f"1. Startup effect: {startup_effect:.1f}% decrease from 10 to 200 moves")
+print(f"2. Optimal batch size for experiments: 100+ moves")
+print(f"3. True per-move cost after startup: ~{timing_stats.iloc[-1]['ms_per_move']:.0f}ms")
+#+end_src
+
+** EXPECTED RESULTS
+1. *Timing curve*: Decreasing per-move cost, plateauing around 140ms/move
+2. *Startup overhead*: 2-3 seconds fixed cost
+3. *Phase analysis*: Early game slower due to more tile spawning animations
+4. *Density impact*: Minimal (<10%) effect on timing
+5. *Best model*: Startup + constant per-move cost
+
+** OBSERVATIONS
+[To be filled during experiment]
+
+** RESULTS
+[To be filled after analysis]
+
+** CONCLUSION
+[To be filled after analysis]
+
+** HYPOTHESIS DEEP DIVE: Why is timing non-linear?
+
+*** Hypothesis 1: Animation/Rendering Overhead
+*Theory*: The game has built-in animations for tile movements and merges
+- Early moves have more "dramatic" animations (tiles sliding across empty board)
+- Later moves have shorter animation distances (board is fuller)
+- Each animation has a fixed minimum duration regardless of distance
+
+*Test approaches*:
+1. Look for command-line flags: ~./2048-debug --help~ or ~-no-animation~
+2. Check environment variables: ~NO_ANIMATION=1 ./2048-debug~
+3. Use ~strings~ on binary to find animation-related text
+4. Monitor with ~dtrace~ to see if there are sleep/usleep calls
+
+*** Hypothesis 2: Terminal I/O Buffering
+*Theory*: Terminal output becomes more efficient with repetition
+- Initial terminal setup has overhead
+- Buffer sizes may adapt over time
+- Screen clearing might be optimized by terminal
+
+*Test approaches*:
+1. Redirect output: ~./2048-debug > /dev/null~ vs normal
+2. Try different terminals: ~xterm~ vs ~Terminal.app~ vs ~iTerm2~
+3. Use ~script~ command to capture raw terminal codes
+4. Test with ~TERM=dumb~ to disable terminal features
+
+*** Hypothesis 3: Game State Complexity
+*Theory*: The game's internal logic changes with board state
+- Empty board requires more random number generation
+- Full board has fewer valid moves (faster to process)
+- Merge detection might short-circuit on crowded boards
+
+*Test approaches*:
+1. Use LLDB to track time spent in different functions
+2. Set breakpoints on RNG calls and count frequency
+3. Measure time between input and first screen update
+4. Profile with ~sample~ or ~instruments~ during gameplay
+
+*** Hypothesis 4: Hidden Debug/Speed Mode
+*Theory*: The binary might have undocumented flags for testing
+- Common in game development for automated testing
+- May bypass animations or delays
+- Could be triggered by specific key sequences
+
+*Test approaches*:
+#+begin_src bash :tangle scripts/exp_011_flag_discovery.sh :shebang #!/bin/bash
+# Discover hidden command-line flags
+echo "=== Searching for hidden flags ==="
+
+# Try common flags
+for flag in --help -h --version -v --fast --no-animation --no-delay --debug --test --speed; do
+    echo "Testing: $flag"
+    timeout 1 ./2048-debug $flag 2>&1 | head -5
+done
+
+# Check for environment variables
+echo -e "\n=== Testing environment variables ==="
+for var in NO_ANIMATION FAST_MODE DEBUG_MODE TEST_MODE NO_DELAY; do
+    echo "Testing: $var=1"
+    timeout 1 env $var=1 ./2048-debug 2>&1 | head -5
+done
+
+# Look for strings in binary
+echo -e "\n=== Strings in binary suggesting options ==="
+strings ./2048-debug | grep -iE "(flag|option|debug|test|fast|speed|delay|anim)" | head -20
+#+end_src
+
+*** Hypothesis 5: Startup Cost Amortization
+*Theory*: Fixed initialization costs are spread over more moves
+- Memory allocation happens once
+- Screen initialization is one-time
+- Random seed generation occurs at start
+
+*Test approaches*:
+1. Time just startup and immediate quit: ~echo "q" | time ./2048-debug~
+2. Compare first move vs 100th move timing
+3. Run multiple games in same process (if possible)
+4. Pre-warm terminal and measure second run
+
+** PROPOSED EXPERIMENT MODIFICATIONS
+Based on our findings, we should:
+1. First run the flag discovery script
+2. Profile the binary with system tools
+3. Test each hypothesis independently
+4. Consider patching the binary if we find timer calls
+
+** IMPLICATIONS
+- If animations are the cause → We need to find/create a no-animation mode
+- If terminal I/O → We should use optimal terminal settings
+- If game complexity → We should model the curve mathematically
+- If hidden flags exist → We can use them for all future experiments
+- If startup cost → We should batch operations optimally
+
+** NEXT STEPS
+1. Run flag discovery script
+2. Analyze binary with ~otool -tV~ to find timer/sleep functions
+3. Test with different terminal configurations
+4. Create binary patch if necessary to remove delays
