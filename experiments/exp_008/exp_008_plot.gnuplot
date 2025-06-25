@@ -1,6 +1,6 @@
 # 2048 Down-Right Spam Distribution Analysis
 set terminal pngcairo size 1200,800 font "Arial,12"
-set output 'exp_008_gnuplot.png'
+set output 'exp_008/exp_008_gnuplot.png'
 
 # Set up the plot
 set title "Score Distribution: 150-Move Down-Right Spam (100 Runs)" font ",16"
@@ -35,7 +35,7 @@ set label 1 sprintf("Statistics:\nMean: %.1f\nMedian: %.1f\nStd Dev: %.1f\nMin: 
 
 # Second plot: Max tile distribution
 set terminal pngcairo size 800,600 font "Arial,12"
-set output 'exp_008_tiles.png'
+set output 'exp_008/exp_008_tiles.png'
 set title "Max Tile Distribution" font ",16"
 set xlabel "Max Tile Value"
 set ylabel "Count"

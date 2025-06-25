@@ -12,7 +12,7 @@ tmux kill-server 2>/dev/null || true
 
 # 2. Build debug version
 echo "Step 2: Building debug binary..."
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 make clean && make CFLAGS="-g -O0" 2048-debug
 
 # 3. Start game in debugger

@@ -15,4 +15,4 @@ binwidth = 50
 bin(x,width) = width*floor(x/width) + width/2.0
 set boxwidth binwidth*0.9
 
-plot 'exp_009_deep_results.csv' every ::1 using (bin($2,binwidth)):(1.0) smooth freq with boxes lc rgb "#4472C4" title "Scores"
+plot '../experiments/exp_009/exp_009_deep_results.csv' every ::1 using (bin($2,binwidth)):(1.0) smooth freq with boxes lc rgb "#4472C4" title "Scores"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Single run to verify direct input works
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Direct Input Verification (20 moves + quit) ==="
 

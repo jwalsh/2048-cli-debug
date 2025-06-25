@@ -1,6 +1,6 @@
 #!/bin/bash
 # Quick test: 3 runs to verify setup before full experiment
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Quick Sanity Check: 3 runs of 150 moves ==="
 MOVES=""

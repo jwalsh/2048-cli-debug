@@ -3,13 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Load results
-import os
-csv_path = os.path.join(os.path.dirname(__file__), 'exp_009_deep_results.csv')
-df = pd.read_csv(csv_path)
+df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'exp_009_deep_results.csv'))
 
 # Create figure with subplots
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
-fig.suptitle(f'2048 Deep Run Analysis: {len(df)} runs, 40 moves each', fontsize=16)
+fig.suptitle('2048 Deep Run Analysis: 100 runs, 40 moves each', fontsize=16)
 
 # 1. Score distribution histogram
 ax1.hist(df['score'], bins=20, edgecolor='black', alpha=0.7, color='steelblue')

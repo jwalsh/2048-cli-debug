@@ -24,7 +24,7 @@ Understanding the true timing model is crucial for:
 
 ** METHOD
 *** Part 1: Map the Timing Curve
-#+begin_src bash :tangle exp_011/scripts/exp_011_timing_curve.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_timing_curve.sh :shebang #!/bin/bash :mkdirp yes
 # Test multiple move counts to map the timing curve
 cd ../../2048-cli-0.9.1
 
@@ -67,7 +67,7 @@ echo -e "\n=== Curve mapping complete ==="
 #+end_src
 
 *** Part 2: Profile Game Phases
-#+begin_src bash :tangle exp_011/scripts/exp_011_phase_analysis.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_phase_analysis.sh :shebang #!/bin/bash :mkdirp yes
 # Analyze timing of different game phases
 cd ../../2048-cli-0.9.1
 
@@ -123,7 +123,7 @@ echo "=== Phase analysis complete ==="
 #+end_src
 
 *** Part 3: Board Density Impact
-#+begin_src bash :tangle exp_011/scripts/exp_011_density_test.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_density_test.sh :shebang #!/bin/bash :mkdirp yes
 # Test if board density affects timing
 cd ../../2048-cli-0.9.1
 
@@ -173,7 +173,7 @@ echo "=== Density test complete ==="
 #+end_src
 
 *** Analysis Script
-#+begin_src python :tangle exp_011/scripts/exp_011_analysis.py
+#+begin_src python :tangle exp_011/scripts/exp_011_analysis.py :mkdirp yes
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -354,7 +354,7 @@ print(f"3. True per-move cost after startup: ~{timing_stats.iloc[-1]['ms_per_mov
 - Could be triggered by specific key sequences
 
 *Test approaches*:
-#+begin_src bash :tangle exp_011/scripts/exp_011_flag_discovery.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_011/scripts/exp_011_flag_discovery.sh :shebang #!/bin/bash :mkdirp yes
 # Discover hidden command-line flags
 echo "=== Searching for hidden flags ==="
 

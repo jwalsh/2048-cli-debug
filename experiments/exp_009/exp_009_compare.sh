@@ -1,6 +1,6 @@
 #!/bin/bash
 # Compare direct input vs tmux approach (5 runs each for quick test)
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Speed Comparison: Direct vs tmux (5 runs each, 20 moves) ==="
 

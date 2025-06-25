@@ -1,9 +1,9 @@
 #!/bin/bash
 # Speed baseline: 10 runs with direct input
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Speed Baseline: 10 runs of 20 moves each ==="
-echo "run,score,time_s" > exp_009_results.csv
+echo "run,score,time_s" > ../experiments/exp_009/exp_009_results.csv
 
 # Move sequence (20 moves + quit)
 MOVES="sdsdsdsdsdsdsdsdsdsdq"
@@ -25,7 +25,7 @@ for run in {1..10}; do
     TIME_S=$(echo "$RUN_END - $RUN_START" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S" >> exp_009_results.csv
+    echo "$run,$SCORE,$TIME_S" >> ../experiments/exp_009/exp_009_results.csv
     
     echo "Run $run: Score=$SCORE, Time=${TIME_S}s"
 done
@@ -39,7 +39,7 @@ echo "Average time per run: $(echo "scale=3; $TOTAL_TIME / 10" | bc)s"
 
 # Quick stats
 echo -e "\n=== SCORE STATISTICS ==="
-awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {print "Mean: " sum/(NR-1) "\nMin: " min "\nMax: " max}' exp_009_results.csv
+awk -F, 'NR>1 {sum+=$2; if($2>max)max=$2; if(min==""||$2<min)min=$2} END {print "Mean: " sum/(NR-1) "\nMin: " min "\nMax: " max}' ../experiments/exp_009/exp_009_results.csv
 
 # Extrapolation
 echo -e "\n=== EXTRAPOLATION ==="

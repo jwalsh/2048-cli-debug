@@ -11,7 +11,7 @@ for i in {1..10}; do
     sleep 0.5
     
     # Start game with known seed (if possible)
-    tmux new-session -d -s verify_$i "./2048-debug"
+    tmux new-session -d -s verify_$i ~../../2048-cli-0.9.1/2048-debug~
     sleep 1
     
     # Make controlled moves

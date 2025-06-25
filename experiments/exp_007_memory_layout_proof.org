@@ -107,7 +107,7 @@ This explains ALL our previous confusion about "flipped" boards!
 
 ** VERIFICATION STATISTICS
 *** Reproducibility Test
-#+begin_src bash :tangle exp_007/scripts/verify_memory_layout.sh :shebang #!/bin/bash
+#+begin_src bash :tangle exp_007/scripts/verify_memory_layout.sh :shebang #!/bin/bash :mkdirp yes
 # Run discovery test 10 times to ensure consistency
 echo "=== Memory Layout Verification Test ==="
 

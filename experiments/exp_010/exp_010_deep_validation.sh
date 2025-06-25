@@ -1,13 +1,13 @@
 #!/bin/bash
 # Deep validation run: 50 runs with 150 moves each
-cd /Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1
+cd ../../2048-cli-0.9.1
 
 echo "=== Experiment #010: Timing Validation ==="
 echo "Hypothesis: 150 moves = ~27.75s per run"
 echo "Total expected time: ~23 minutes"
 echo ""
 echo "Starting at $(date)"
-echo "run,score,time_s,max_tile,moves_per_second" > exp_010_results.csv
+echo "run,score,time_s,max_tile,moves_per_second" > ../experiments/exp_010/exp_010_results.csv
 
 # Generate move sequence (150 moves = 75 SD pairs + quit)
 MOVES=""
@@ -35,7 +35,7 @@ for run in {1..50}; do
     MOVES_PER_SEC=$(echo "scale=3; 150 / $TIME_S" | bc)
     
     # Save result
-    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> exp_010_results.csv
+    echo "$run,$SCORE,$TIME_S,$MAX_TILE,$MOVES_PER_SEC" >> ../experiments/exp_010/exp_010_results.csv
     
     # Progress with timing prediction
     if (( run % 5 == 0 )); then

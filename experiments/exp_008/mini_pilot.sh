@@ -2,7 +2,7 @@
 # Fixed mini pilot: 3 runs with proper tmux handling
 
 # Get the directory where the game is located
-GAME_DIR="/Users/jasonwalsh/projects/jwalsh/2048/2048-cli-0.9.1"
+GAME_DIR="../../2048-cli-0.9.1"
 GAME_EXEC="$GAME_DIR/2048-debug"
 
 # Verify game exists
