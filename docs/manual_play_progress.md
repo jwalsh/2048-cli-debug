@@ -47,4 +47,4 @@ tmux send-keys -t game2048 [s/d/a/w]
 sleep 0.2 && tmux capture-pane -t game2048 -p | head -10
 ```
 
-"The boring is the learning" - User, 2024 🎮
+"The boring is the learning" - User, 2024 🎮Score: 208, Highest tile: 32, Moves made: ~50+
