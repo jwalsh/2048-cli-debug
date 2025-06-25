@@ -43,6 +43,8 @@ Score: 1708 (+4) 🎉
 - **Memory Analysis**: Tools for inspecting game state and board memory layout
 - **AI Analysis**: Observe and analyze AI gameplay patterns
 - **Build Automation**: Enhanced Makefile with debugging and source management targets
+- **TTY Controller**: Automated gameplay with complexity detection and manual inspection points
+- **Board Analyzer**: Real-time complexity scoring and strategy suggestions
 
 ## 📋 Requirements
 
@@ -86,6 +88,25 @@ make etags
 
 # Custom board size
 ./2048 --size 5
+```
+
+### TTY Controller (New!)
+
+```bash
+# Set up Python environment
+uv sync
+
+# Run automated test with manual inspection points
+uv run python -m tty_manual.manual_test_runner \
+  --spam-moves 50 \
+  --check-interval 10 \
+  --threshold 60
+
+# Analyze a board snapshot
+uv run python -m tty_manual.board_analyzer board_test.txt
+
+# Interactive TTY reader
+uv run python -m tty_manual.tty_reader --interactive
 ```
 
 ### Debugging
