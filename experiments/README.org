@@ -10,6 +10,16 @@ This directory contains all experiments for the 2048 CLI debugging project. Each
 
 ** Completed Experiments
 
+*** Early Explorations (001-006)
+| Exp # | Title                      | Key Finding                              | Status   |
+|-------+----------------------------+------------------------------------------+----------|
+|   001 | TTY Control                | tmux most reliable for TTY interaction   | COMPLETE |
+|   002 | Down-Right Spam            | 1708 score with weighted random spam     | COMPLETE |
+|   003 | LLDB Memory Inspection     | Discovered game state structure          | COMPLETE |
+|   004 | Grid Layout                | Confirmed row-major layout               | COMPLETE |
+|   005 | UI/Memory Alignment        | Found rendering discrepancies            | COMPLETE |
+|   006 | Process Chaos              | Learned importance of process hygiene    | COMPLETE |
+
 *** Memory and Game Mechanics (007-011)
 | Exp # | Title                         | Key Finding                                    | Status   |
 |-------+-------------------------------+------------------------------------------------+----------|

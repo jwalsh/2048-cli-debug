@@ -1,0 +1,58 @@
+#+TITLE: Stable Scripts and Tools
+#+DATE: [2025-06-25]
+
+* Overview
+
+This directory contains scripts and tools that have been promoted from experiments after proving their stability and usefulness.
+
+* Promotion Criteria
+
+Scripts are promoted from experiments/ to scripts/ when they:
+1. Have been tested thoroughly in experiments
+2. Provide a stable, well-defined interface
+3. Are useful across multiple experiments
+4. Have clear documentation
+5. Handle errors gracefully
+
+* Current Tools
+
+** tty_manual/ (in root)
+- *Status*: Stable Python package
+- *Origin*: Experiments 001-002
+- *Purpose*: TTY interaction framework
+- *Interface*: ~TTYReader~, ~BoardAnalyzer~
+
+** Candidates for Promotion
+
+*** lldb_controller.py (exp_017)
+- *Status*: Framework started, needs completion
+- *Purpose*: Automated LLDB control
+- *Interface*: ~LLDBController~ class
+- *Blockers*: Needs more testing, error handling
+
+*** Process Management (exp_006)
+- *Status*: Cleanup scripts proven useful
+- *Purpose*: Process hygiene
+- *Candidate*: ~cleanup.sh~ emergency cleanup
+
+*** Board State Capture (exp_003, exp_005)
+- *Status*: Techniques proven
+- *Purpose*: Simultaneous UI/memory capture
+- *Needs*: Unified interface
+
+* Future Interfaces
+
+When these tools are ready for promotion, we might formalize them with:
+- Pydantic models for data structures
+- Type hints and contracts
+- Formal specifications (TLA+, Lean)
+- Property-based testing
+
+* Usage Guidelines
+
+Promoted scripts should:
+- Have clear command-line interfaces
+- Return standard exit codes
+- Output parseable formats (JSON, CSV)
+- Include --help documentation
+- Handle common error cases
