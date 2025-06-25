@@ -1,6 +1,8 @@
 #+TITLE: Experiment #009: Speed Baseline - Direct Binary Input
 #+DATE: [2025-06-25]
 
+[[file:exp_009_deep_analysis.png]]
+
 * EXPERIMENT #009: Direct Binary Input Speed Test
 :PROPERTIES:
 :ID: exp-009-speed-baseline
