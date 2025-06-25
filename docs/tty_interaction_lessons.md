@@ -1,0 +1,46 @@
+# TTY Interaction Lessons
+
+## What Actually Worked
+
+### tmux Approach
+```bash
+# Start game in detached session
+tmux new-session -d -s game2048 '2048-cli-0.9.1/2048'
+
+# Send individual keystrokes
+tmux send-keys -t game2048 s  # down
+tmux send-keys -t game2048 d  # right
+tmux send-keys -t game2048 a  # left
+tmux send-keys -t game2048 w  # up
+
+# Capture current state
+tmux capture-pane -t game2048 -p | head -10
+```
+
+### Key Insights
+1. **Real TTY interaction requires persistence** - Can't use one-shot scripts
+2. **tmux > screen > expect** - For interactive control
+3. **Manual is better than automated** - For learning how programs behave
+4. **Observability is key** - Always check state after each action
+
+### Why This Matters for GDB
+- Same principle: attach to running process
+- Send commands, observe state changes
+- Build mental model through interaction
+- No abstractions between you and the program
+
+### User Wisdom
+- "the boring is the learning"
+- "remember basics: it's a tty; don't over think it"
+- "other people watch esports: i watch incremental work on 2048 via tmux"
+- "humans do this for 'fun'...i don't get it but for our gdb experience it's been delightful"
+
+## Next Evolution: GDB
+Once we've mastered TTY control, the same patterns apply to debugger control:
+- Attach to process
+- Set breakpoints
+- Inspect memory
+- Modify state
+- Continue execution
+
+The 2048 grind taught us patience and observation - exactly what we need for GDB!

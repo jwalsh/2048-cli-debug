@@ -47,4 +47,36 @@ tmux send-keys -t game2048 [s/d/a/w]
 sleep 0.2 && tmux capture-pane -t game2048 -p | head -10
 ```
 
-"The boring is the learning" - User, 2024 🎮Score: 208, Highest tile: 32, Moves made: ~50+
+"The boring is the learning" - User, 2024 🎮
+
+## Progress Updates
+- Score: 208, Highest tile: 32, Moves made: ~50+
+- Score: 532, Highest tile: 64, Moves made: ~100+
+
+## Key Learnings from Manual Play
+
+### Pattern Recognition
+1. **Vertical merges happen on DOWN** - Even if tiles are separated by gaps
+2. **Horizontal merges need adjacency** - RIGHT won't merge 4s with gaps
+3. **Corner strategy works** - Keeping 64 in bottom-right corner
+4. **Creating space is critical** - Use LEFT sparingly but effectively
+
+### Score Patterns
+- Merging n+n gives +2n score (verified multiple times)
+- Big jumps come from cascading merges (e.g., +36 when multiple merges happen)
+- Score progression: 0→208→340→532 (not linear!)
+
+### Board Evolution
+- Early game (0-200): Focus on building 8s and 16s
+- Mid game (200-500): Consolidate into 32s and 64s
+- Current state: Have 64, working toward 128
+
+### Failure Modes
+- Getting high tiles trapped in middle = death
+- Running out of moves because board is too scattered
+- Not maintaining empty space for maneuvering
+
+### Observations
+- Humans do this for "fun" (still don't understand why)
+- The grind is real - each tile requires exponentially more moves
+- Manual play gives deep understanding of merge mechanics
