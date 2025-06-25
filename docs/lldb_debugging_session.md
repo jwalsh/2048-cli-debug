@@ -371,6 +371,11 @@ idx = col * 4 + row  # Column-major, not row * 4 + col
 **Problem**: Raw memory dumps hard to interpret
 **Solution**: Multiple output formats + Python decoder + hexdump integration
 
+### 6. Stuck Game State
+**Problem**: Board became stuck at score 376, unable to make moves
+**Observation**: May have inadvertently quit the game while debugging
+**Solution**: Attempt to restore from core dump (see below)
+
 ### Key Learnings for Debugger Workflows
 1. **Timing is critical** - Commands need proper delays to avoid concatenation
 2. **Multiple capture methods** - Always have fallback strategies

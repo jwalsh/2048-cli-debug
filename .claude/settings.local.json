@@ -17,7 +17,10 @@
       "Bash(tmux capture-pane:*)",
       "Bash(tmux send-keys:*)",
       "Bash(clang:*)",
-      "Bash(# Save current game state to binary file\ntmux send-keys -t lldb2048 \"memory read --outfile game_quicksave.bin --binary --count 200 g\" Enter)"
+      "Bash(# Save current game state to binary file\ntmux send-keys -t lldb2048 \"memory read --outfile game_quicksave.bin --binary --count 200 g\" Enter)",
+      "Bash(# Check if LLDB is still running with the game\ntmux capture-pane -t lldb2048:0 -p | tail -20)",
+      "Bash(# Send DOWN to merge the 8s\ntmux send-keys -t lldb2048:0 \"s\")",
+      "Bash(# Check result\nsleep 1\ntmux capture-pane -t lldb2048:0 -p | grep -B 2 -A 10 \"Score:\")"
     ]
   },
   "enableAllProjectMcpServers": false

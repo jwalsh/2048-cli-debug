@@ -1,0 +1,24 @@
+Every 0.5s: tmux capture-...  Jasons-MacBook-Pro.local: Wed Jun 25 10:25:59 2025
+
+watch -n 0.5 'tmux capture-pane -t lldb2048.0 -p | grep -A 10 Score || echo No g
+ame display'
+Now using node v23.10.0 (npm v10.9.2)
+➜  2048-cli-0.9.1 watch -n 0.5 'tmux capture-pane -t lldb2048.0 -p | grep -A 10
+Score || echo No game display'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
