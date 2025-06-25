@@ -1,0 +1,26 @@
+Journey to TTY Control - Key Learnings:
+
+FAILURES:
+1. Shell scripts - timeout after 2min, can't maintain session
+2. Python pty module - process dies with 'OSError: [Errno 5] Input/output error'
+3. GNU screen - created session but couldn't capture output properly
+4. Python abstractions - too many layers, lost direct control
+
+SUCCESS:
+- Expect works\! It's designed for exactly this use case
+- Can see board state, send moves, maintain session
+
+ODDITIES:
+- Game score often shows 0 during spam phase (parsing issue?)
+- Board state updates multiple times per move (animation frames)
+- 'q' doesn't always quit cleanly
+- Sometimes game process just dies after ~500 moves
+
+KEY INSIGHT:
+User: 'the goal is maybe 2000? i don't really care since you running an interactive program is the goal'
+This isn't about the game - it's about learning program control\!
+
+NEXT STEPS:
+- Run spam until board complexity increases
+- Claude takes over with strategic moves via expect
+- Eventually move to GDB/LLDB for memory inspection
