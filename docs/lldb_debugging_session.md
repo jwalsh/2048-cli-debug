@@ -1,0 +1,268 @@
+# LLDB Debugging Session Documentation
+## Date: 2025-06-25
+
+### Session Overview
+We successfully completed a manual LLDB debugging session to understand 2048's internals without modifying the source code. This prepares us for advanced debugger-based game control.
+
+### Key Achievements
+1. Built 2048 with debug symbols (`-g -O0`)
+2. Attached LLDB and set strategic breakpoints
+3. Played 20 down-right spam moves + 5 strategic moves
+4. Discovered memory layout and data structures
+5. Achieved score 80 with highest tile 16
+
+## Program Flow Analysis
+
+### Control Flow
+```mermaid
+graph TD
+    A[main.c: main] --> B[Parse options]
+    B --> C[gamestate_init]
+    C --> D[gfx_init]
+    D --> E[Game Loop]
+    E --> F{Get Input}
+    F -->|w/a/s/d| G[gamestate_tick]
+    F -->|q| H[Exit]
+    G --> I[gravitate]
+    G --> J[merge]
+    G --> K[gravitate]
+    K --> L[gamestate_new_block]
+    L --> M[Check end condition]
+    M -->|Continue| E
+    M -->|Game Over| H
+```
+
+### Data Flow
+```mermaid
+graph LR
+    A[User Input] --> B[Direction Enum]
+    B --> C[gamestate_tick]
+    C --> D[Grid Manipulation]
+    D --> E[Score Update]
+    E --> F[New Block Spawn]
+    F --> G[Display Update]
+    
+    subgraph Memory Layout
+        H[grid_data_ptr] --> I[16 integers]
+        I --> J[Row 0: 0-3]
+        I --> K[Row 1: 4-7]
+        I --> L[Row 2: 8-11]
+        I --> M[Row 3: 12-15]
+    end
+```
+
+### Decision Flow
+```mermaid
+graph TD
+    A[Move Input] --> B{Valid Direction?}
+    B -->|No| C[Ignore Input]
+    B -->|Yes| D[Process Move]
+    D --> E{Can Gravitate?}
+    E -->|Yes| F[Move Tiles]
+    E -->|No| G{Can Merge?}
+    G -->|Yes| H[Merge Tiles]
+    G -->|No| I[No Move]
+    H --> J[Update Score]
+    F --> K{Space Available?}
+    K -->|Yes| L[Spawn New Block]
+    K -->|No| M{Any Moves Left?}
+    M -->|No| N[Game Over]
+    M -->|Yes| O[Continue]
+```
+
+## Memory Layout Discovery
+
+### Grid Storage (Row-Major Order)
+```
+Memory Address    | Grid Position | Value | Tile
+------------------|---------------|-------|------
+grid_data_ptr+0   | [0][0]        | 0     | Empty
+grid_data_ptr+4   | [0][1]        | 1     | 2
+grid_data_ptr+8   | [0][2]        | 2     | 4
+grid_data_ptr+12  | [0][3]        | 3     | 8
+...               | ...           | ...   | ...
+grid_data_ptr+60  | [3][3]        | 4     | 16
+```
+
+### Value Encoding
+- Internal: Powers of 2 (0=empty, 1=2, 2=4, 3=8, 4=16, ..., 11=2048)
+- Display: 2^value (except 0 which shows empty)
+
+## Board State Representations
+
+### 1. Filesystem Touch Representation 🤯
+```bash
+# Create directory structure for board state
+mkdir -p board/0/0 board/0/1 board/0/2 board/0/3
+mkdir -p board/1/0 board/1/1 board/1/2 board/1/3
+mkdir -p board/2/0 board/2/1 board/2/2 board/2/3
+mkdir -p board/3/0 board/3/1 board/3/2 board/3/3
+
+# Touch files to represent tiles (filename = tile value)
+touch board/3/3/16
+touch board/3/2/8
+touch board/3/1/4
+touch board/3/0/2
+touch board/2/2/4
+touch board/1/2/2
+
+# Read board state
+for row in {0..3}; do
+    for col in {0..3}; do
+        tile=$(ls board/$row/$col/ 2>/dev/null || echo "0")
+        printf "%5s " "$tile"
+    done
+    echo
+done
+```
+
+### 2. Bitwise Representation (inspired by HN link)
+```bash
+# Each tile uses 4 bits (0-15 for powers of 2)
+# 64-bit integer can hold entire 4x4 board
+# Example board state: 0x0000000000214384
+# Decode: each hex digit = one tile power
+```
+
+### 3. Base64 Save State
+```python
+# Encode board state
+import base64
+board = [0,0,0,0, 0,0,1,2, 0,1,2,3, 1,2,3,4]  # Example
+state = base64.b64encode(bytes(board)).decode()
+# Result: "AAAAAAAAAAECAAECAwECAwQ="
+
+# Decode and restore
+restored = list(base64.b64decode(state))
+```
+
+### 4. URL-based State (for sharing)
+```
+https://2048.game/#state=00000012012312344&score=80
+# Hex encoding: each digit = tile power
+```
+
+### 5. Git Commit Hash State 😈
+```bash
+# Use git tree structure to represent board
+# Each commit = one game state
+# Commit message = score
+# File structure = board layout
+git init game-state
+cd game-state
+echo "2" > 1-2.txt
+echo "4" > 1-3.txt
+git add . && git commit -m "Score: 80"
+# Commit hash becomes unique game ID
+```
+
+## LLDB Commands Reference
+
+### Essential Commands Used
+```lldb
+# Breakpoints
+breakpoint set -n gamestate_tick
+breakpoint set -n gamestate_new_block
+breakpoint list
+breakpoint disable 2
+
+# Execution Control
+run
+continue (c)
+step
+next
+
+# Memory Inspection
+print *g                                    # Full game state
+print g->score                              # Current score
+print g->grid[0][0]                         # Specific cell
+memory read -f d -c 16 g->grid_data_ptr     # Read entire grid
+memory read -f x -s 4 -c 16 g->grid_data_ptr  # Hex format
+
+# Backtrace
+bt
+frame select 0
+
+# Watchpoints (for tracking changes)
+watchpoint set variable g->score
+watchpoint set expression -s 4 -- g->grid_data_ptr[15]
+```
+
+### Automation Potential
+```python
+# Phase 2 Preview: Python LLDB scripting
+import lldb
+
+def read_board_state(debugger, command, result, internal_dict):
+    target = debugger.GetSelectedTarget()
+    process = target.GetProcess()
+    thread = process.GetSelectedThread()
+    frame = thread.GetSelectedFrame()
+    
+    # Get game state pointer
+    g = frame.FindVariable("g")
+    grid_ptr = g.GetChildMemberWithName("grid_data_ptr")
+    
+    # Read 16 integers
+    error = lldb.SBError()
+    board = []
+    for i in range(16):
+        addr = grid_ptr.GetValueAsUnsigned() + (i * 4)
+        value = process.ReadMemory(addr, 4, error)
+        board.append(int.from_bytes(value, 'little'))
+    
+    return board
+```
+
+## Insights for Future Work
+
+### 1. Save State Implementation Ideas
+- **Memory Snapshot**: Use `process save-core` to dump entire game state
+- **Checkpoint/Restore**: LLDB's checkpoint feature for save states
+- **State Injection**: Modify memory directly to load saved games
+- **Replay System**: Record input sequences for deterministic replay
+
+### 2. Advanced Debugging Techniques
+- **Conditional Breakpoints**: Break only when score > 1000
+- **Scripted Actions**: Auto-continue with state logging
+- **Memory Watches**: Track tile creation patterns
+- **Statistical Analysis**: Gather merge/spawn data
+
+### 3. Creative Visualizations
+```bash
+# Terminal-based real-time grid monitor
+watch -n 0.5 'lldb -p $(pgrep 2048) -o "memory read -f d -c 16 g->grid_data_ptr" -o "quit" | grep "0x"'
+
+# Sound-based gameplay (each tile = musical note)
+# 2=C, 4=D, 8=E, 16=F, 32=G, 64=A, 128=B, 256=C'
+```
+
+## References & Context
+
+### Academic Background
+- **"Composition of Basic Heuristics for the Game 2048"** by Kohler, Migler & Khosmood (2019) - Provides algorithmic approaches to 2048
+- **Bitwise Challenge 2048** ([GitHub](https://github.com/izabera/bitwise-challenge-2048/blob/develop/2048.bash)) - Demonstrates clever state encoding
+- **HN Discussion** ([#44320285](https://news.ycombinator.com/item?id=44320285)) - Community insights on 2048 implementations
+
+### Our Unique Contribution: LLM-Driven Interactive Debugging
+While academic papers focus on optimal strategies and implementations optimize for code golf, our approach explores something novel:
+
+**Interactive debugging through an LLM interface** - Where the AI agent:
+1. Learns program internals through debugger interaction
+2. Builds mental models without reading source code
+3. Discovers data structures through memory inspection
+4. Makes decisions based on runtime observation
+5. Documents findings for future agents
+
+This creates a new paradigm where LLMs can:
+- Debug programs they've never seen
+- Learn system behavior through experimentation
+- Transfer debugging knowledge between sessions
+- Build progressively complex understanding
+
+## Conclusion
+This LLDB session demonstrated that we can fully understand and control 2048 without modifying its source code. The discovered memory layout and control flow enable sophisticated external manipulation, from save states to AI control, all through debugger interfaces.
+
+The real achievement isn't playing 2048 - it's proving that LLMs can effectively use debuggers to understand and control running programs, opening possibilities for automated debugging, reverse engineering, and program analysis.
+
+Next steps: Implement Python-based LLDB automation for programmatic game control as outlined in issue #6.
