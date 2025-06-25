@@ -1,0 +1,110 @@
+#+TITLE: 2048 Debugging Experiments Overview
+#+DATE: [2025-06-25]
+#+OPTIONS: toc:2
+
+* Overview
+
+This directory contains all experiments for the 2048 CLI debugging project. Each experiment follows a rigorous scientific methodology with clear hypotheses, methods, and results.
+
+* Experiment Index
+
+** Completed Experiments
+
+*** Memory and Game Mechanics (007-011)
+| Exp # | Title                         | Key Finding                                    | Status   |
+|-------+-------------------------------+------------------------------------------------+----------|
+|   007 | Memory Layout Proof           | Grid uses column-major indexing: grid[col][row] | COMPLETE |
+|   008 | Statistical Validation        | Down-right spam produces predictable distribution | COMPLETE |
+|   009 | Speed Baseline                | Game has built-in ~160ms/move animation delay | COMPLETE |
+|   010 | Timing Validation             | Non-linear timing: 0.141s/move at 150 moves   | COMPLETE |
+|   011 | Timing Curve Analysis         | Board locking contributes to timing speedup    | PLANNED  |
+
+*** AI Players (012-016)
+| Exp # | Title                    | Hypothesis                                  | Status  |
+|-------+--------------------------+---------------------------------------------+---------|
+|   012 | Basic Claude Player      | Claude can play by analyzing board states   | PLANNED |
+|   013 | Strategic Claude Player  | Strategic planning improves performance     | PLANNED |
+|   014 | Interactive Claude       | Real-time analysis improves decisions       | PLANNED |
+|   015 | Claude Takeover Mode     | Taking over stuck games yields insights     | PLANNED |
+|   016 | Expect-based Control     | Expect scripts provide reliable control     | PLANNED |
+
+*** Debugging Framework (017-020)
+| Exp # | Title                  | Hypothesis                                | Status  |
+|-------+------------------------+-------------------------------------------+---------|
+|   017 | LLDB Controller        | LLDB enables complete game control        | PLANNED |
+|   018 | Debug Spam Analysis    | Spam patterns analyzable via debugger     | PLANNED |
+|   019 | Universal Debugger     | Techniques generalize to other programs   | PLANNED |
+|   020 | Save/Restore Workflow  | Game states can be saved/restored         | PLANNED |
+
+*** Board Analysis (021-025)
+| Exp # | Title                      | Hypothesis                              | Status  |
+|-------+----------------------------+-----------------------------------------+---------|
+|   021 | Filesystem Representation  | Board as filesystem reveals patterns    | PLANNED |
+|   022 | Board State Analysis       | Specific states reveal strategies       | PLANNED |
+|   023 | TTY/Screen Interaction     | Alternative interaction methods         | PLANNED |
+|   024 | Spam Strategies            | Different spam patterns have signatures | PLANNED |
+|   025 | Automated Play             | Automation reveals game mechanics       | PLANNED |
+
+* Key Results Summary
+
+** Experiment 007: Memory Layout Discovery
+#+INCLUDE: "exp_007_memory_layout_proof.org::*CONCLUSION" :only-contents t
+
+** Experiment 008: Statistical Validation  
+#+INCLUDE: "exp_008_statistical_validation.org::*CONCLUSION" :only-contents t
+
+** Experiment 009: Speed Baseline
+#+INCLUDE: "exp_009_speed_baseline.org::*CONCLUSION" :only-contents t
+
+** Experiment 010: Timing Validation
+#+INCLUDE: "exp_010_timing_validation.org::*CONCLUSION" :only-contents t
+
+* Experimental Framework
+
+All experiments follow the template in [[file:EXPERIMENT_TEMPLATE.org][EXPERIMENT_TEMPLATE.org]] which includes:
+
+- Clear hypothesis statement
+- Reproducible methodology  
+- Expected vs actual results
+- Statistical analysis where appropriate
+- Lessons learned and future work
+
+* Running Experiments
+
+** Prerequisites
+- 2048-cli compiled with debug symbols
+- tmux for TTY interaction
+- Python 3.x with pandas, matplotlib
+- LLDB for debugging experiments
+- Emacs with org-mode for documentation
+
+** Basic Workflow
+1. Create experiment directory: ~mkdir exp_NNN~
+2. Copy template: ~cp EXPERIMENT_TEMPLATE.org exp_NNN_description.org~
+3. Write hypothesis and method
+4. Implement scripts using ~:tangle~ blocks
+5. Run experiment and collect data
+6. Analyze results and draw conclusions
+7. Update this README with key findings
+
+* Lessons Learned
+
+** Technical Discoveries
+1. *Grid indexing*: The game uses ~grid[col][row]~, not ~grid[row][col]~
+2. *Animation delays*: Built-in ~160ms/move delay cannot be bypassed
+3. *Board locking*: Down-right spam often leads to locked boards
+4. *Non-linear timing*: Per-move time decreases with more moves
+
+** Methodological Insights
+1. *Mini pilots*: Always test with 3-5 runs before full experiments
+2. *Path management*: Use relative paths and ~:mkdirp yes~
+3. *Org-mode tangling*: Run from project root for proper paths
+4. *Statistical rigor*: 100+ runs needed for meaningful distributions
+
+* Future Directions
+
+1. Complete AI player experiments (012-016)
+2. Build LLDB automation framework (017)
+3. Investigate board pattern recognition (021-022)
+4. Create comprehensive game state serialization (020)
+5. Develop optimal playing strategies based on findings

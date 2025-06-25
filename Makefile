@@ -69,4 +69,16 @@ remake: clean all
 clean:
 	rm -f $(PROGRAM) $(PROGRAM)_debug
 
+experiments/README.txt: experiments/README.org
+	## Publish experiments overview to ASCII text
+	@echo "Publishing experiments overview to ASCII..."
+	@emacs --batch \
+		--eval "(require 'org)" \
+		--eval "(require 'ox-ascii)" \
+		--eval "(find-file \"experiments/README.org\")" \
+		--eval "(org-ascii-export-to-ascii)" \
+		--eval "(kill-emacs)"
+	@mv experiments/README.txt experiments/README.txt 2>/dev/null || true
+	@echo "Published to experiments/README.txt"
+
 .PHONY: clean remake all terminal curses sdl debug-terminal debug-curses debug-sdl gdb-run

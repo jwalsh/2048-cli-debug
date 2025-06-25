@@ -97,6 +97,22 @@ for row, col in ui_positions:
     print(f"UI [{row}][{col}] = grid[{col}][{row}]")
 #+end_src
 
+** RESULTS SUMMARY
+:PROPERTIES:
+:CUSTOM_ID: exp-007-results
+:END:
+
+*** Key Discovery
+The 2048 grid uses *column-major* indexing in its 2D array representation:
+- To access UI position [row][col], use: ~grid[col][row]~
+- Memory layout is still row-major when flattened
+- This counter-intuitive indexing caused initial confusion
+
+*** Verification
+- ✅ 10/10 reproducibility test runs confirmed column-major behavior
+- ✅ Memory dumps match UI when using grid[col][row]
+- ✅ Cache performance tests show expected patterns
+
 ** CONCLUSION
 ✅ HYPOTHESIS PARTIALLY CORRECT:
 - Values ARE powers of 2 (0=empty, 1=2, etc.)

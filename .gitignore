@@ -5,3 +5,5 @@
 TAGS
 # But allow our backup
 !2048-cli-src-backup.tar.gz
+# Ignore generated text report
+experiments/README.txt
