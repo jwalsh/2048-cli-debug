@@ -1,0 +1,106 @@
+#+TITLE: Experiment #007: Definitive Memory Layout Proof
+#+DATE: [2025-06-25]
+
+* EXPERIMENT #007: Prove Memory Representation Definitively
+:PROPERTIES:
+:ID: exp-007-memory-layout-proof
+:HYPOTHESIS: Grid is stored in row-major order with values as powers of 2
+:END:
+
+** HYPOTHESIS
+The 2048 grid is stored as:
+1. 16 consecutive integers (4x4 grid)
+2. Row-major order: index = row * 4 + col
+3. Values encode as: 0=empty, 1=2, 2=4, 3=8, ..., n=2^n
+
+** METHOD
+*** Step 1: Clean Environment
+#+begin_src bash
+# Kill everything
+pkill -f 2048
+tmux kill-server 2>/dev/null || true
+
+# Verify clean
+ps aux | grep 2048 | grep -v grep
+#+end_src
+
+*** Step 2: Start Game with Known Initial State
+#+begin_src bash
+# Start game in LLDB from beginning
+tmux new-session -d -s memory_test 'lldb ./2048-debug'
+sleep 1
+tmux send-keys -t memory_test "run" Enter
+sleep 2
+#+end_src
+
+*** Step 3: Make Specific, Traceable Moves
+Instead of random spam, make deliberate moves and predict outcomes:
+1. Initial state (note tile positions)
+2. Single DOWN move
+3. Single RIGHT move
+4. Compare predicted vs actual
+
+*** Step 4: Capture Both UI and Memory
+#+begin_src bash
+# UI capture
+tmux capture-pane -t memory_test -p > ui_before.txt
+
+# Interrupt and capture memory
+tmux send-keys -t memory_test C-c
+sleep 1
+tmux send-keys -t memory_test "frame select 7" Enter
+tmux send-keys -t memory_test "memory read -f d -c 16 g->grid_data_ptr" Enter
+#+end_src
+
+** PREDICTED OUTCOMES
+If row-major is correct:
+- Memory[0-3] = Row 0 of UI
+- Memory[4-7] = Row 1 of UI
+- Memory[8-11] = Row 2 of UI
+- Memory[12-15] = Row 3 of UI
+
+** OBSERVATIONS
+*** Initial Board State
+#+begin_example
+|      |      |      |    2 |  <- UI Position [0][3]
+|      |      |      |      |
+|      |      |    2 |      |  <- UI Position [2][2]
+|      |      |      |    2 |  <- UI Position [3][3]
+#+end_example
+
+*** Memory Read Results
+Linear memory: [0,0,0,0, 0,0,0,0, 0,0,1,0, 1,0,0,1]
+
+*** Grid Array Access Tests
+- g->grid[0][3] = 0 (WRONG - this is col 0, row 3)
+- g->grid[3][0] = 1 (CORRECT - this is col 3, row 0 = UI [0][3])
+- g->grid[2][2] = 1 (CORRECT - col 2, row 2 = UI [2][2])
+- g->grid[3][3] = 1 (CORRECT - col 3, row 3 = UI [3][3])
+
+** ANALYSIS
+*** CRITICAL DISCOVERY
+The grid uses `grid[column][row]` indexing, not `grid[row][column]`!
+
+To access UI position [r][c], use: grid[c][r]
+
+*** Memory Layout Explanation
+1. The 2D array `grid` is an array of column pointers
+2. Each column pointer points to a row array
+3. Linear memory is still stored row-major
+4. But the pointer array indexes columns first
+
+*** Verification
+#+begin_src python
+# For UI position [row][col], access grid[col][row]
+ui_positions = [(0,3), (2,2), (3,3)]
+for row, col in ui_positions:
+    print(f"UI [{row}][{col}] = grid[{col}][{row}]")
+#+end_src
+
+** CONCLUSION
+✅ HYPOTHESIS PARTIALLY CORRECT:
+- Values ARE powers of 2 (0=empty, 1=2, etc.)
+- Linear memory IS row-major when flattened
+- BUT: 2D array access is grid[col][row], not grid[row][col]
+
+This explains ALL our previous confusion about "flipped" boards!

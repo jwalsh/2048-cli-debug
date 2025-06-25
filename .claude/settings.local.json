@@ -25,7 +25,10 @@
       "Bash(# Use the newer PID\ntmux send-keys -t game2048_fresh:lldb C-c  # Cancel if needed\ntmux send-keys -t game2048_fresh:lldb \"lldb -p 21821\" Enter)",
       "Bash(# Check final state\nsleep 1\ntmux capture-pane -t clean2048 -p)",
       "Bash(# Save current state with our workflow\n/Users/jasonwalsh/projects/jwalsh/2048/save_analyze_workflow.sh)",
-      "Bash(# Manually save the game state\ntmux send-keys -t game2048:lldb \"memory read --outfile score180_grid.bin --binary --count 64 g->grid_data_ptr\" Enter\nsleep 0.5\ntmux send-keys -t game2048:lldb \"process save-core score180_game.core\" Enter)"
+      "Bash(# Manually save the game state\ntmux send-keys -t game2048:lldb \"memory read --outfile score180_grid.bin --binary --count 64 g->grid_data_ptr\" Enter\nsleep 0.5\ntmux send-keys -t game2048:lldb \"process save-core score180_game.core\" Enter)",
+      "Bash(emacs:*)",
+      "Bash(./exp_009_verify.sh:*)",
+      "Bash(./exp_009_speed_test.sh:*)"
     ]
   },
   "enableAllProjectMcpServers": false

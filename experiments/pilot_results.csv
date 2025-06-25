@@ -1,0 +1,4 @@
+run,score,max_tile,final_board,timestamp
+1,184,32,pilot_run_1_board.txt,13
+2,8,8,pilot_run_2_board.txt,15
+3,164,32,pilot_run_3_board.txt,13
