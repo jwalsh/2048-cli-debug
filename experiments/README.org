@@ -6,6 +6,8 @@
 
 This directory contains all experiments for the 2048 CLI debugging project. Each experiment follows a rigorous scientific methodology with clear hypotheses, methods, and results.
 
+Current experiment count: 35 (11 completed, 3 in-progress, 21 planned)
+
 * Experiment Index
 
 ** Completed Experiments
@@ -55,6 +57,24 @@ This directory contains all experiments for the 2048 CLI debugging project. Each
 |   024 | Spam Strategies            | Different spam patterns have signatures | PLANNED |
 |   025 | Automated Play             | Automation reveals game mechanics       | PLANNED |
 
+*** Extended Research (026-031)
+| Exp # | Title                    | Hypothesis                                    | Status     |
+|-------+--------------------------+-----------------------------------------------+------------|
+|   026 | Memory Persistence       | Game state can be saved/restored via LLDB    | IN-PROGRESS |
+|   027 | Core Dump Restoration    | Core dumps enable game state persistence     | PLANNED    |
+|   028 | AI Score Distribution    | AI produces uniform 800-1600 distribution    | COMPLETED  |
+|   029 | Timing Curve Deep Dive   | Non-linear timing has specific patterns      | PLANNED    |
+|   030 | Board Complexity Metrics | Complexity scoring predicts game difficulty   | COMPLETED  |
+|   031 | WASM Build Infrastructure| 2048 can run in browser with debugging       | PLANNED    |
+
+*** Game Debugging Beyond 2048 (032-035)
+| Exp # | Title                      | Hypothesis                                    | Status  |
+|-------+----------------------------+-----------------------------------------------+---------|
+|   032 | Minimal Flappy Debug       | Debugger-first game design improves learning | PLANNED |
+|   033 | Moon Buggy Debug Analysis  | Moon Buggy ideal for debugging research      | PLANNED |
+|   034 | NSnake Analysis            | Snake too simple for meaningful research     | PLANNED |
+|   035 | Claude Takeover Workflow   | Standardized workflow improves performance   | PLANNED |
+
 * Key Results Summary
 
 ** Experiment 007: Memory Layout Discovery
@@ -68,6 +88,12 @@ This directory contains all experiments for the 2048 CLI debugging project. Each
 
 ** Experiment 010: Timing Validation
 #+INCLUDE: "exp_010_timing_validation.org::*CONCLUSION" :only-contents t
+
+** Experiment 028: AI Score Distribution
+#+INCLUDE: "exp_028_ai_score_distribution.org::*CONCLUSION" :only-contents t
+
+** Experiment 030: Board Complexity Metrics
+#+INCLUDE: "exp_030_board_complexity_metrics.org::*CONCLUSION" :only-contents t
 
 * Experimental Framework
 
@@ -118,3 +144,6 @@ All experiments follow the template in [[file:EXPERIMENT_TEMPLATE.org][EXPERIMEN
 3. Investigate board pattern recognition (021-022)
 4. Create comprehensive game state serialization (020)
 5. Develop optimal playing strategies based on findings
+6. Execute Claude takeover workflow (035) to beat high score
+7. Port debugging techniques to Moon Buggy (033)
+8. Complete WASM build for browser-based debugging (031)
