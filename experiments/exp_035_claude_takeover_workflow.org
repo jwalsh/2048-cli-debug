@@ -1,0 +1,413 @@
+#+TITLE: Experiment #035: Claude Takeover Workflow
+#+DATE: [2025-06-26]
+#+STATUS: PLANNED
+
+* EXPERIMENT #035: Claude Takeover Workflow
+:PROPERTIES:
+:ID: exp-035-claude-takeover-workflow
+:HYPOTHESIS: A standardized workflow for Claude to take over complex boards will improve scores
+:STATUS: PLANNED
+:END:
+
+** HYPOTHESIS
+We can establish a repeatable workflow where:
+1. Initialize controlled environment (tmux + LLDB + 2048)
+2. Execute down-right spam until board becomes complex
+3. Detect when board complexity threshold is reached
+4. Claude analyzes the board and plays strategically
+5. Document heuristics and patterns discovered
+
+** RATIONALE
+The user has identified that the key learning happens when Claude must exercise judgment on complex boards. We need a standardized workflow to:
+- Consistently create complex board states
+- Hand off control at the right moment
+- Allow Claude to learn from strategic decisions
+- Build a knowledge base of heuristics
+
+** METHOD
+
+*** Step 1: Environment Initialization
+#+begin_src bash :tangle exp_035/scripts/01_initialize_environment.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Initialize tmux + LLDB + 2048 environment
+
+echo "=== Step 1: Environment Initialization ==="
+
+# Clean slate
+echo "Cleaning existing processes..."
+pkill -f 2048 2>/dev/null
+tmux kill-session -t game2048 2>/dev/null
+tmux kill-session -t lldb2048 2>/dev/null
+sleep 1
+
+# Start game in tmux
+echo "Starting 2048 in tmux session..."
+cd ../../2048-cli-0.9.1
+tmux new-session -d -s game2048 "./2048-debug"
+sleep 0.5
+
+# Get PID
+GAME_PID=$(pgrep -f "2048-debug" | head -1)
+echo "Game PID: $GAME_PID"
+
+# Start LLDB in separate tmux session
+echo "Starting LLDB session..."
+tmux new-session -d -s lldb2048
+tmux send-keys -t lldb2048 "lldb -p $GAME_PID" Enter
+sleep 1
+
+# Set up breakpoints for analysis
+tmux send-keys -t lldb2048 "breakpoint set -n gamestate_tick" Enter
+sleep 0.2
+tmux send-keys -t lldb2048 "breakpoint set -n gamestate_new_block" Enter
+sleep 0.2
+
+echo "Environment ready!"
+echo "- Game session: tmux attach -t game2048"
+echo "- LLDB session: tmux attach -t lldb2048"
+#+end_src
+
+*** Step 2: Down-Right Spam Phase
+#+begin_src bash :tangle exp_035/scripts/02_downright_spam.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Execute down-right spam until board is complex
+
+echo "=== Step 2: Down-Right Spam Phase ==="
+
+# Parameters
+SPAM_MOVES=50  # Default number of moves
+MOVE_DELAY=0.05
+
+if [ "$1" ]; then
+    SPAM_MOVES=$1
+fi
+
+echo "Executing $SPAM_MOVES down-right moves..."
+
+# Execute spam pattern
+for i in $(seq 1 $SPAM_MOVES); do
+    # Down
+    tmux send-keys -t game2048 "s"
+    sleep $MOVE_DELAY
+    
+    # Right
+    tmux send-keys -t game2048 "d"
+    sleep $MOVE_DELAY
+    
+    # Progress indicator every 10 moves
+    if [ $((i % 10)) -eq 0 ]; then
+        echo "Progress: $i/$SPAM_MOVES moves"
+    fi
+done
+
+echo "Spam phase complete!"
+
+# Capture final board state
+sleep 0.5
+tmux capture-pane -t game2048 -p | head -15 > spam_result.txt
+echo "Board state saved to spam_result.txt"
+#+end_src
+
+*** Step 3: Complexity Detection
+#+begin_src python :tangle exp_035/scripts/03_detect_complexity.py :mkdirp yes
+#!/usr/bin/env python3
+"""Detect when board has reached complexity threshold."""
+
+import re
+import sys
+
+def parse_board_from_tmux(tmux_output):
+    """Extract board state from tmux capture."""
+    lines = tmux_output.strip().split('\n')
+    board = []
+    score = 0
+    
+    # Find score
+    for line in lines:
+        if "Score:" in line:
+            score_match = re.search(r'Score:\s*(\d+)', line)
+            if score_match:
+                score = int(score_match.group(1))
+            break
+    
+    # Find board
+    board_started = False
+    for line in lines:
+        if '|' in line and line.count('|') >= 4:
+            # Parse row
+            cells = line.split('|')[1:-1]  # Remove empty first/last
+            row = []
+            for cell in cells:
+                cell = cell.strip()
+                if cell:
+                    row.append(int(cell))
+                else:
+                    row.append(0)
+            if len(row) == 4:
+                board.append(row)
+    
+    return board, score
+
+def calculate_complexity(board):
+    """Calculate board complexity metrics."""
+    # Count empty cells
+    empty_cells = sum(1 for row in board for cell in row if cell == 0)
+    
+    # Find highest tile
+    highest_tile = max(max(row) for row in board)
+    
+    # Count unique tiles
+    unique_tiles = len(set(cell for row in board for cell in row if cell > 0))
+    
+    # Calculate disorder (tiles not in decreasing order)
+    disorder = 0
+    flat_board = [cell for row in board for cell in row if cell > 0]
+    for i in range(len(flat_board) - 1):
+        if flat_board[i] < flat_board[i + 1]:
+            disorder += 1
+    
+    # Complexity score (0-100)
+    complexity = 0
+    complexity += (16 - empty_cells) * 3  # Fewer empty = more complex
+    complexity += min(highest_tile // 32, 10) * 2  # Higher tiles = more complex
+    complexity += unique_tiles * 2  # More variety = more complex
+    complexity += disorder * 2  # More disorder = more complex
+    
+    return {
+        'empty_cells': empty_cells,
+        'highest_tile': highest_tile,
+        'unique_tiles': unique_tiles,
+        'disorder': disorder,
+        'complexity_score': min(complexity, 100)
+    }
+
+def should_claude_takeover(metrics):
+    """Determine if board is complex enough for Claude."""
+    # Thresholds for takeover
+    if metrics['empty_cells'] <= 4:  # Board getting full
+        return True
+    if metrics['highest_tile'] >= 64:  # High value tiles
+        return True
+    if metrics['complexity_score'] >= 60:  # General complexity
+        return True
+    return False
+
+if __name__ == '__main__':
+    # Read board state
+    with open('spam_result.txt', 'r') as f:
+        tmux_output = f.read()
+    
+    board, score = parse_board_from_tmux(tmux_output)
+    metrics = calculate_complexity(board)
+    
+    print(f"=== Board Complexity Analysis ===")
+    print(f"Score: {score}")
+    print(f"Empty cells: {metrics['empty_cells']}")
+    print(f"Highest tile: {metrics['highest_tile']}")
+    print(f"Unique tiles: {metrics['unique_tiles']}")
+    print(f"Disorder: {metrics['disorder']}")
+    print(f"Complexity score: {metrics['complexity_score']}/100")
+    print()
+    
+    if should_claude_takeover(metrics):
+        print("✅ BOARD IS COMPLEX - Claude should take over!")
+        sys.exit(0)
+    else:
+        print("❌ Board not complex enough - continue spam")
+        sys.exit(1)
+#+end_src
+
+*** Step 4: Claude Analysis Template
+#+begin_src org :tangle exp_035/claude_analysis_template.org :mkdirp yes
+#+TITLE: Claude Board Analysis - Round [N]
+#+DATE: [timestamp]
+
+* Board State
+#+begin_example
+Score: [score]
+[board visualization]
+#+end_example
+
+* Initial Analysis
+** Immediate Observations
+- Highest tile location:
+- Empty cells available:
+- Potential merges:
+- Trapped tiles:
+- Risk factors:
+
+** Strategic Assessment
+- Primary goal:
+- Secondary goals:
+- Constraints:
+
+* Move Sequence Planning
+** Option 1: [Direction]
+- Rationale:
+- Expected outcome:
+- Risk:
+
+** Option 2: [Direction]
+- Rationale:
+- Expected outcome:
+- Risk:
+
+** Decision: [Chosen move]
+- Why this move:
+
+* Heuristics Discovered
+1. [New heuristic learned from this position]
+2. [Another pattern recognized]
+
+* Post-Move Analysis
+** Actual outcome:
+** Surprise factor:
+** Learning:
+#+end_src
+
+*** Step 5: Full Workflow Runner
+#+begin_src bash :tangle exp_035/scripts/run_full_workflow.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Run complete Claude takeover workflow
+
+echo "=== Claude Takeover Workflow ==="
+echo "Goal: Beat high score of 1708"
+echo
+
+# Step 1: Initialize
+./01_initialize_environment.sh
+sleep 2
+
+# Step 2: Spam until complex
+SPAM_ROUNDS=0
+MAX_ROUNDS=10
+
+while [ $SPAM_ROUNDS -lt $MAX_ROUNDS ]; do
+    echo -e "\n--- Spam Round $((SPAM_ROUNDS + 1)) ---"
+    
+    # Do 20 moves at a time
+    ./02_downright_spam.sh 20
+    
+    # Check complexity
+    python3 03_detect_complexity.py
+    
+    if [ $? -eq 0 ]; then
+        echo "Board is complex enough!"
+        break
+    fi
+    
+    SPAM_ROUNDS=$((SPAM_ROUNDS + 1))
+done
+
+# Step 3: Prepare for Claude
+echo -e "\n=== Preparing Claude Handoff ==="
+
+# Capture current state
+tmux capture-pane -t game2048 -p > claude_takeover_board.txt
+
+# Get memory state from LLDB
+tmux send-keys -t lldb2048 "print *g" Enter
+sleep 0.5
+tmux capture-pane -t lldb2048 -p | grep -A 20 "gamestate" > claude_takeover_memory.txt
+
+# Create analysis file
+cp claude_analysis_template.org "claude_analysis_$(date +%Y%m%d_%H%M%S).org"
+
+echo -e "\n✅ Ready for Claude takeover!"
+echo "Board state: claude_takeover_board.txt"
+echo "Memory dump: claude_takeover_memory.txt"
+echo "Analysis template created"
+echo
+echo "Claude should now:"
+echo "1. Analyze the board in claude_takeover_board.txt"
+echo "2. Make strategic moves via: tmux send-keys -t game2048 [w/a/s/d]"
+echo "3. Document decisions and learnings"
+#+end_src
+
+*** Heuristics Database
+#+begin_src org :tangle exp_035/heuristics_learned.org :mkdirp yes
+#+TITLE: 2048 Heuristics Learned by Claude
+#+DATE: [2025-06-26]
+
+* Meta-Heuristics
+1. *Complexity Threshold*: Take over when empty cells ≤ 4 or highest tile ≥ 64
+2. *Transition Timing*: Down-right spam effective until ~50-100 moves
+3. *Board Evaluation*: Consider empty space, tile order, merge potential
+
+* Position-Specific Heuristics
+** Corner Control
+- Keep highest tile in corner (preferably bottom-right)
+- Build decreasing sequence along edges
+- Never move highest tile away from corner
+
+** Space Management  
+- Maintain 2-4 empty cells for maneuverability
+- Create space before it's desperately needed
+- Use perpendicular moves to open lanes
+
+** Merge Patterns
+- Vertical merges happen even with gaps (DOWN)
+- Horizontal merges require adjacency (RIGHT)
+- Chain merges by setting up cascades
+- Merge smaller tiles first to create space
+
+** Recovery Moves
+- When stuck: try perpendicular to usual pattern
+- LEFT is emergency escape, not routine move
+- UP is last resort, often fatal
+
+** Specific Positions
+[To be filled by Claude during experiments]
+
+*** Example Entry:
+Position: Two 32s not in corners, 3 empty cells
+Heuristic: Prioritize merging 32s even if it means temporary disorder
+Reasoning: 64 in wrong position is better than two 32s blocking board
+Outcome: Successfully created 64, opened 2 cells
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Spam Phase*: 50-100 moves creates boards with 64-128 highest tile
+2. *Complexity Detection*: Triggers at 60+ complexity score
+3. *Claude Performance*: Should beat spam-only score of 1708
+4. *Heuristics*: 10-20 position-specific patterns discovered
+
+** WORKFLOW DIAGRAM
+
+#+begin_src ditaa :file exp_035_workflow.png :cmdline -E
++----------------+     +------------------+     +-------------------+
+|  Initialize    |     |   Down-Right     |     | Complexity Check  |
+|  tmux + LLDB   |---->|   Spam Phase     |---->| Score >= 60?      |
+|  + 2048-debug  |     |   (20 moves)     |     | Empty <= 4?       |
++----------------+     +------------------+     +---+----------+----+
+                              ^                      |No        |Yes
+                              |                      |          |
+                              +----------------------+          v
+                                                    +-------------------+
+                                                    | Claude Takes Over |
+                                                    | - Analyze board   |
+                                                    | - Strategic moves |
+                                                    | - Learn heuristics|
+                                                    +-------------------+
+                                                              |
+                                                              v
+                                                    +-------------------+
+                                                    | Document Results  |
+                                                    | - Score achieved  |
+                                                    | - Patterns found  |
+                                                    | - Update database |
+                                                    +-------------------+
+#+end_src
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** CONCLUSION
+[To be completed after multiple runs]
+
+** RELATED EXPERIMENTS
+- [[file:exp_001_manual_control.org][Experiment #001]]: Basic tmux control
+- [[file:exp_002_down_right_spam.org][Experiment #002]]: Spam strategy
+- [[file:exp_008_statistical_validation.org][Experiment #008]]: Score distributions
+- [[file:exp_030_board_complexity_metrics.org][Experiment #030]]: Complexity metrics

@@ -1,0 +1,336 @@
+#+TITLE: Experiment #034: NSnake Debug Analysis
+#+DATE: [2025-06-26]
+#+STATUS: PLANNED
+
+* EXPERIMENT #034: NSnake Debug Analysis
+:PROPERTIES:
+:ID: exp-034-nsnake-debug-analysis
+:HYPOTHESIS: Snake provides simpler debugging target than Moon Buggy
+:STATUS: PLANNED
+:END:
+
+** HYPOTHESIS
+NSnake (FreeBSD port) analysis for debugging comparison:
+1. Simpler state than Moon Buggy (just position array)
+2. No physics simulation (discrete movement)
+3. Fewer interacting systems
+4. Easier to predict and control
+
+** RATIONALE
+Comparing Snake vs Moon Buggy as debugging targets:
+- Snake: ~500-1000 lines, simple state
+- Moon Buggy: ~3000 lines, physics simulation
+- Need to determine best target for LLM/debug work
+
+** METHOD
+
+*** Analyze FreeBSD Port Structure
+#+begin_src bash :tangle exp_034/scripts/analyze_nsnake_port.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Analyze NSnake FreeBSD port structure
+
+echo "=== NSnake FreeBSD Port Analysis ==="
+
+# Check port info
+echo -e "\n1. Port information:"
+if [ -f /usr/ports/games/nsnake/Makefile ]; then
+    grep -E "^(PORTNAME|PORTVERSION|COMMENT)" /usr/ports/games/nsnake/Makefile
+fi
+
+# Check distinfo
+echo -e "\n2. Source details:"
+if [ -f /usr/ports/games/nsnake/distinfo ]; then
+    cat /usr/ports/games/nsnake/distinfo
+fi
+
+# Check package description
+echo -e "\n3. Package description:"
+if [ -f /usr/ports/games/nsnake/pkg-descr ]; then
+    cat /usr/ports/games/nsnake/pkg-descr
+fi
+
+# Check installed files
+echo -e "\n4. Installed files:"
+if command -v pkg &> /dev/null; then
+    pkg info -l nsnake 2>/dev/null | head -20
+fi
+#+end_src
+
+*** Extract Source Code Analysis
+#+begin_src bash :tangle exp_034/scripts/extract_nsnake_source.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Extract and analyze NSnake source
+
+WORK_DIR="/tmp/nsnake-analysis"
+mkdir -p $WORK_DIR
+cd $WORK_DIR
+
+echo "=== Extracting NSnake Source ==="
+
+# Download source
+if [ ! -f nsnake-3.0.0.tar.xz ]; then
+    echo "Downloading source..."
+    fetch https://github.com/alexdantas/nSnake/releases/download/v3.0.0/nsnake-3.0.0.tar.xz
+fi
+
+# Extract
+tar xf nsnake-3.0.0.tar.xz
+cd nsnake-3.0.0
+
+echo -e "\n=== Source Structure ==="
+find . -name "*.c" -o -name "*.h" | head -20
+
+echo -e "\n=== Code Complexity ==="
+echo "Total C files: $(find . -name "*.c" | wc -l)"
+echo "Total lines: $(find . -name "*.c" -exec wc -l {} + | tail -1)"
+
+echo -e "\n=== Key Data Structures ==="
+grep -n "struct.*{" src/*.h 2>/dev/null | head -10
+#+end_src
+
+*** Snake Game State Analysis
+#+begin_src c :tangle exp_034/snake_state_analysis.h :mkdirp yes
+/* snake_state_analysis.h - Expected Snake game state structure */
+
+/* Typical Snake game state - MUCH simpler than Moon Buggy */
+typedef struct {
+    /* Snake body - just an array of positions */
+    struct position {
+        int x;
+        int y;
+    } body[MAX_SNAKE_LENGTH];
+    
+    int length;           /* Current snake length */
+    int direction;        /* UP, DOWN, LEFT, RIGHT */
+    
+    /* Food position */
+    int food_x;
+    int food_y;
+    
+    /* Game state */
+    int score;
+    int game_over;
+    int speed_delay;      /* Milliseconds between moves */
+    
+    /* Grid size */
+    int width;
+    int height;
+} snake_state;
+
+/* Key differences from Moon Buggy:
+ * - No physics (velocity, gravity, jumping)
+ * - No multiple object types (meteors, lasers)
+ * - Single direction input (4 choices vs complex)
+ * - Deterministic movement (grid-based)
+ */
+#+end_src
+
+*** Debug Comparison Matrix
+#+begin_src python :tangle exp_034/compare_games.py :mkdirp yes
+#!/usr/bin/env python3
+"""Compare Snake vs Moon Buggy for debugging."""
+
+import pandas as pd
+
+def create_comparison():
+    """Create detailed comparison matrix."""
+    
+    comparison_data = {
+        'Aspect': [
+            'Code Size (lines)',
+            'State Variables',
+            'Physics Simulation',
+            'Object Types',
+            'Input Complexity',
+            'Timing Model',
+            'Debug Interest',
+            'Breakpoint Locations',
+            'State Predictability',
+            'AI Difficulty',
+            'Memory Layout',
+            'Learning Curve'
+        ],
+        'Snake': [
+            '~500-1000',
+            '~10 (position array + food)',
+            'None',
+            '2 (snake, food)',
+            '4 directions',
+            'Turn-based/simple timer',
+            'Low',
+            '~5 key functions',
+            'High (deterministic)',
+            'Trivial',
+            'Simple array',
+            'Very easy'
+        ],
+        'Moon Buggy': [
+            '~3000',
+            '~50 (physics, objects, terrain)',
+            'Gravity, velocity, momentum',
+            '4+ (buggy, meteors, ground, laser)',
+            'Jump, shoot, timing',
+            'Real-time physics',
+            'High',
+            '~15 key functions',
+            'Medium (physics-based)',
+            'Interesting',
+            'Multiple structures',
+            'Moderate'
+        ],
+        'Winner': [
+            'Snake',
+            'Snake',
+            'Moon Buggy',
+            'Moon Buggy',
+            'Snake',
+            'Snake',
+            'Moon Buggy',
+            'Moon Buggy',
+            'Snake',
+            'Moon Buggy',
+            'Snake',
+            'Snake'
+        ]
+    }
+    
+    df = pd.DataFrame(comparison_data)
+    
+    # Count wins
+    snake_wins = (df['Winner'] == 'Snake').sum()
+    moon_buggy_wins = (df['Winner'] == 'Moon Buggy').sum()
+    
+    print("=== Snake vs Moon Buggy Comparison ===\n")
+    print(df.to_string(index=False))
+    print(f"\nSnake advantages: {snake_wins}")
+    print(f"Moon Buggy advantages: {moon_buggy_wins}")
+    
+    # Overall recommendation
+    print("\n=== Recommendation ===")
+    if moon_buggy_wins > snake_wins:
+        print("Moon Buggy is the better choice for LLM/debug work")
+        print("Reasons:")
+        print("- Richer state space for interesting debugging")
+        print("- Physics provides complex but understandable behavior")
+        print("- Multiple systems to instrument and analyze")
+    else:
+        print("Snake might be better for initial experiments")
+        print("Reasons:")
+        print("- Simpler to understand completely")
+        print("- Easier to get started")
+        print("- But less interesting for advanced work")
+
+if __name__ == '__main__':
+    create_comparison()
+#+end_src
+
+*** LLDB Hook Points for Snake
+#+begin_src c :tangle exp_034/snake_debug_hooks.h :mkdirp yes
+/* snake_debug_hooks.h - LLDB integration for Snake */
+
+/* Minimal set of functions to hook */
+#define SNAKE_BREAKPOINTS \
+    "move_snake",         /* Main movement logic */ \
+    "check_collision",    /* Hit detection */ \
+    "place_food",         /* RNG usage */ \
+    "update_score",       /* Score changes */ \
+    "handle_input"        /* Direction changes */
+
+/* Simple state inspection */
+#define INSPECT_SNAKE \
+    "p snake_length, snake_direction"
+
+#define INSPECT_POSITION \
+    "p snake_body[0].x, snake_body[0].y"
+
+/* For automated play */
+typedef struct {
+    int head_x, head_y;
+    int food_x, food_y;
+    int direction;
+    int length;
+} debug_snake_state;
+
+/* Snake is SO simple that debugging is almost trivial */
+void debug_snake_decision(debug_snake_state *s) {
+    /* Basic AI: move toward food */
+    if (s->head_x < s->food_x && s->direction != LEFT) {
+        s->direction = RIGHT;
+    } else if (s->head_x > s->food_x && s->direction != RIGHT) {
+        s->direction = LEFT;
+    } else if (s->head_y < s->food_y && s->direction != UP) {
+        s->direction = DOWN;
+    } else if (s->head_y > s->food_y && s->direction != DOWN) {
+        s->direction = UP;
+    }
+}
+#+end_src
+
+*** Why Snake is TOO Simple
+#+begin_src org :tangle exp_034/snake_limitations.org :mkdirp yes
+* Snake Limitations for Debug Research
+
+** Why Snake Falls Short
+
+*** 1. Trivial State Space
+- Position array + food location = ~20 variables max
+- No interesting interactions between components
+- Debugging is almost too easy
+
+*** 2. No Physics
+- Discrete grid movement
+- No timing challenges
+- No momentum or complex calculations
+
+*** 3. Limited Decision Space
+- Only 4 possible moves
+- Obvious optimal strategy (go to food)
+- No interesting trade-offs
+
+*** 4. Boring for Claude
+- Not enough complexity to showcase AI reasoning
+- Limited opportunities for strategic thinking
+- Trivial to solve optimally
+
+** Conclusion: Moon Buggy Wins
+
+While Snake is easier to understand, it's TOO simple for meaningful debugging research. Moon Buggy provides:
+
+1. *Rich debugging targets* without being overwhelming
+2. *Interesting physics* that can be analyzed
+3. *Multiple systems* that interact in complex ways
+4. *Strategic decisions* (when to jump, when to shoot)
+
+Snake would be like debugging "Hello World" - educational but not research-worthy.
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *NSnake Source*: ~1000 lines of C code
+2. *State Complexity*: ~20 variables total
+3. *Debug Points*: 4-5 key functions
+4. *AI Implementation*: Trivial pathfinding
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** ANALYSIS: Snake vs Moon Buggy vs Flappy Bird
+
+| Game | Lines | Physics | State | Debug Value | Verdict |
+|------+-------+---------+-------+-------------+---------|
+| Snake | ~1000 | None | Simple | Low | Too simple |
+| Flappy Bird | ~500 | Basic | Minimal | Medium | Good start |
+| Moon Buggy | ~3000 | Complex | Rich | High | Best choice |
+
+** CONCLUSION
+
+For LLM/debugging research priorities:
+1. *Moon Buggy* - Best overall (complex but manageable)
+2. *Flappy Bird* - Good for initial experiments (our minimal version)
+3. *Snake* - Too simple, not research-worthy
+
+Snake is the "Hello World" of game debugging - fine for learning basics but not for pushing boundaries of automated debugging research.
+
+** RELATED EXPERIMENTS
+- [[file:exp_032_minimal_flappy_debug.org][Experiment #032]]: Minimal Flappy Bird
+- [[file:exp_033_moon_buggy_debug_analysis.org][Experiment #033]]: Moon Buggy analysis

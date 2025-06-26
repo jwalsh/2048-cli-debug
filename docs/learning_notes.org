@@ -1,8 +1,9 @@
-# Learning Notes: The Real Goal
+#+TITLE: Learning Notes: The Real Goal
+#+DATE: [2025-06-25]
 
-## It's Not About 2048!
+* It's Not About 2048!
 
-The user just clarified the actual goal: **Learn to interact with running programs through their real interfaces**.
+The user just clarified the actual goal: *Learn to interact with running programs through their real interfaces*.
 
 2048 is just a convenient test case for learning:
 - TTY attachment and control
@@ -10,21 +11,21 @@ The user just clarified the actual goal: **Learn to interact with running progra
 - Making decisions based on current program state
 - Eventually: GDB/LLDB memory inspection
 
-## The Learning Path
+* The Learning Path
 
-1. **Shell scripts** ❌ (timeout, can't maintain session)
-2. **Python TTY abstractions** ❌ (too abstracted, process crashes)
-3. **GNU Screen** ❌ (couldn't capture output properly)
-4. **Expect** ✅ (designed for this exact use case!)
-5. **Next: GDB/LLDB** (direct memory inspection)
+1. *Shell scripts* ❌ (timeout, can't maintain session)
+2. *Python TTY abstractions* ❌ (too abstracted, process crashes)
+3. *GNU Screen* ❌ (couldn't capture output properly)
+4. *Expect* ✅ (designed for this exact use case!)
+5. *Next: GDB/LLDB* (direct memory inspection)
 
-## Key Insight
+* Key Insight
 
 "imagine i said 'create an eshell in emacs' and we would not have a great time"
 
 This perfectly captures it - some tasks require real interaction with the running process, not abstractions or wrappers.
 
-## What Success Looks Like
+* What Success Looks Like
 
 - Not beating 2048
 - Not reaching score 2000

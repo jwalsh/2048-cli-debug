@@ -1,0 +1,624 @@
+#+TITLE: Experiment #032: Minimal Debugger-First Flappy Bird
+#+DATE: [2025-06-25]
+#+STATUS: PLANNED
+
+* EXPERIMENT #032: Minimal Debugger-First Flappy Bird
+:PROPERTIES:
+:ID: exp-032-minimal-flappy-debug
+:HYPOTHESIS: A game designed for debugging is more valuable than a game designed for fun
+:STATUS: PLANNED
+:END:
+
+** HYPOTHESIS
+We can create a Flappy Bird clone that:
+1. Is under 500 lines of C code
+2. Has completely deterministic behavior (no randomness)
+3. Exposes all state in a single debuggable structure
+4. Reuses 2048's debugging infrastructure
+5. Enables frame-by-frame analysis and control
+
+** RATIONALE
+- Games as debugging test beds, not entertainment
+- Deterministic behavior enables reproducible experiments
+- Minimal state simplifies analysis
+- LLDB integration from day one
+- Perfect for AI control experiments
+
+** METHOD
+
+*** Core Game State (100% Debuggable)
+#+begin_src c :tangle exp_032/src/flappy.h :mkdirp yes
+#ifndef FLAPPY_H
+#define FLAPPY_H
+
+/* All game constants for easy tweaking in debugger */
+#define GRAVITY 0.5f
+#define JUMP_VELOCITY -8.0f
+#define SCROLL_SPEED 2
+#define PIPE_WIDTH 8
+#define PIPE_GAP 60
+#define PIPE_SPACING 80
+#define BIRD_X 20
+#define SCREEN_WIDTH 80
+#define SCREEN_HEIGHT 24
+
+/* Single game state structure - everything in one place for LLDB */
+struct gamestate {
+    /* Bird physics - easy to inspect/modify */
+    float bird_y;
+    float bird_velocity;
+    
+    /* World state - deterministic pipe positions */
+    int world_tick;        /* Frame counter for reproducibility */
+    int next_pipe_x;       /* When to spawn next pipe */
+    
+    /* Fixed pipe array - no dynamic allocation */
+    struct pipe {
+        int x;
+        int gap_top;       /* Top of gap (deterministic pattern) */
+        int active;
+    } pipes[3];
+    
+    /* Game status */
+    int alive;
+    int score;
+    int collision_tick;    /* When bird died (for debugging) */
+    
+    /* Debug helpers */
+    int freeze_physics;    /* Pause physics but keep rendering */
+    int step_mode;         /* Advance one frame at a time */
+    char last_input;       /* For input debugging */
+};
+
+/* Minimal API matching 2048 patterns */
+struct gamestate* game_init(void);
+void game_tick(struct gamestate *g, int input);
+void game_free(struct gamestate *g);
+int game_over(struct gamestate *g);
+
+#endif /* FLAPPY_H */
+#+end_src
+
+*** Deterministic Game Engine
+#+begin_src c :tangle exp_032/src/engine.c :mkdirp yes
+#include <stdlib.h>
+#include <string.h>
+#include "flappy.h"
+
+struct gamestate* game_init(void) {
+    struct gamestate *g = calloc(1, sizeof(struct gamestate));
+    
+    /* Initial state - always the same */
+    g->bird_y = SCREEN_HEIGHT / 2.0f;
+    g->bird_velocity = 0.0f;
+    g->alive = 1;
+    g->world_tick = 0;
+    g->next_pipe_x = SCREEN_WIDTH;
+    
+    /* No pipes initially */
+    for (int i = 0; i < 3; i++) {
+        g->pipes[i].active = 0;
+    }
+    
+    return g;
+}
+
+/* Deterministic pipe pattern - no randomness! */
+static int get_pipe_gap_top(int pipe_number) {
+    /* Simple wave pattern for testing */
+    int patterns[] = {8, 10, 12, 10, 8, 6, 8, 10};
+    return patterns[pipe_number % 8];
+}
+
+static void spawn_pipe(struct gamestate *g) {
+    /* Find inactive pipe slot */
+    for (int i = 0; i < 3; i++) {
+        if (!g->pipes[i].active) {
+            g->pipes[i].x = SCREEN_WIDTH;
+            g->pipes[i].gap_top = get_pipe_gap_top(g->score);
+            g->pipes[i].active = 1;
+            g->next_pipe_x = SCREEN_WIDTH + PIPE_SPACING;
+            break;
+        }
+    }
+}
+
+static void check_collisions(struct gamestate *g) {
+    int bird_x = BIRD_X;
+    int bird_y_int = (int)g->bird_y;
+    
+    /* Screen bounds */
+    if (bird_y_int <= 0 || bird_y_int >= SCREEN_HEIGHT - 1) {
+        g->alive = 0;
+        g->collision_tick = g->world_tick;
+        return;
+    }
+    
+    /* Pipe collisions */
+    for (int i = 0; i < 3; i++) {
+        if (!g->pipes[i].active) continue;
+        
+        /* Bird overlaps pipe horizontally? */
+        if (bird_x >= g->pipes[i].x && bird_x < g->pipes[i].x + PIPE_WIDTH) {
+            /* Check vertical collision */
+            int gap_bottom = g->pipes[i].gap_top + PIPE_GAP;
+            if (bird_y_int < g->pipes[i].gap_top || bird_y_int > gap_bottom) {
+                g->alive = 0;
+                g->collision_tick = g->world_tick;
+                return;
+            }
+        }
+    }
+}
+
+void game_tick(struct gamestate *g, int input) {
+    if (!g->alive && !g->step_mode) return;
+    
+    /* Record input for debugging */
+    g->last_input = input ? input : '.';
+    
+    /* Handle input */
+    if (input == ' ' || input == 'w') {
+        g->bird_velocity = JUMP_VELOCITY;
+    }
+    
+    /* Debug controls */
+    if (input == 'f') g->freeze_physics = !g->freeze_physics;
+    if (input == 's') g->step_mode = !g->step_mode;
+    
+    /* Physics (can be frozen for debugging) */
+    if (!g->freeze_physics) {
+        g->bird_velocity += GRAVITY;
+        g->bird_y += g->bird_velocity;
+        
+        /* Update pipes */
+        for (int i = 0; i < 3; i++) {
+            if (g->pipes[i].active) {
+                g->pipes[i].x -= SCROLL_SPEED;
+                
+                /* Score when pipe passes bird */
+                if (g->pipes[i].x + PIPE_WIDTH == BIRD_X) {
+                    g->score++;
+                }
+                
+                /* Deactivate off-screen pipes */
+                if (g->pipes[i].x + PIPE_WIDTH < 0) {
+                    g->pipes[i].active = 0;
+                }
+            }
+        }
+        
+        /* Spawn new pipes at fixed positions */
+        if (g->next_pipe_x <= SCREEN_WIDTH) {
+            spawn_pipe(g);
+        } else {
+            g->next_pipe_x -= SCROLL_SPEED;
+        }
+    }
+    
+    /* Always check collisions */
+    if (g->alive) {
+        check_collisions(g);
+    }
+    
+    /* Increment frame counter */
+    g->world_tick++;
+}
+
+void game_free(struct gamestate *g) {
+    free(g);
+}
+
+int game_over(struct gamestate *g) {
+    return !g->alive;
+}
+#+end_src
+
+*** ASCII Graphics Backend
+#+begin_src c :tangle exp_032/src/gfx_terminal.c :mkdirp yes
+#include <stdio.h>
+#include <stdlib.h>
+#include <termios.h>
+#include <unistd.h>
+#include "flappy.h"
+#include "gfx.h"
+
+struct gfx_state {
+    struct termios old_tio, new_tio;
+};
+
+struct gfx_state* gfx_init(struct gamestate *g) {
+    struct gfx_state *s = malloc(sizeof(struct gfx_state));
+    
+    /* Setup non-blocking input like 2048 */
+    tcgetattr(STDIN_FILENO, &s->old_tio);
+    s->new_tio = s->old_tio;
+    s->new_tio.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &s->new_tio);
+    
+    /* Hide cursor */
+    printf("\033[?25l");
+    
+    return s;
+}
+
+void gfx_draw(struct gfx_state *s, struct gamestate *g) {
+    /* Clear screen */
+    printf("\033[2J\033[H");
+    
+    /* Header with debug info */
+    printf("Score: %d | Tick: %d | Bird: %.1f,%.1f | Input: %c | %s %s\n",
+           g->score, g->world_tick, g->bird_y, g->bird_velocity,
+           g->last_input,
+           g->freeze_physics ? "[FROZEN]" : "",
+           g->step_mode ? "[STEP]" : "");
+    printf("----------------------------------------\n");
+    
+    /* Create screen buffer */
+    char screen[SCREEN_HEIGHT][SCREEN_WIDTH + 1];
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            screen[y][x] = ' ';
+        }
+        screen[y][SCREEN_WIDTH] = '\0';
+    }
+    
+    /* Draw pipes */
+    for (int i = 0; i < 3; i++) {
+        if (!g->pipes[i].active) continue;
+        
+        int px = g->pipes[i].x;
+        if (px >= 0 && px < SCREEN_WIDTH) {
+            /* Draw pipe with gap */
+            for (int y = 0; y < SCREEN_HEIGHT; y++) {
+                if (y < g->pipes[i].gap_top || y > g->pipes[i].gap_top + PIPE_GAP) {
+                    for (int w = 0; w < PIPE_WIDTH && px + w < SCREEN_WIDTH; w++) {
+                        if (px + w >= 0) {
+                            screen[y][px + w] = '#';
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /* Draw bird */
+    int bird_y_int = (int)g->bird_y;
+    if (bird_y_int >= 0 && bird_y_int < SCREEN_HEIGHT) {
+        screen[bird_y_int][BIRD_X] = g->alive ? '>' : 'X';
+    }
+    
+    /* Print screen */
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        printf("%s\n", screen[y]);
+    }
+    
+    /* Debug commands help */
+    if (!g->alive) {
+        printf("\nGAME OVER at tick %d\n", g->collision_tick);
+    }
+    printf("\nControls: SPACE=jump, F=freeze, S=step, Q=quit\n");
+    
+    fflush(stdout);
+}
+
+int gfx_getch(struct gfx_state *s) {
+    int ch = 0;
+    if (read(STDIN_FILENO, &ch, 1) < 0) {
+        return -1;
+    }
+    return ch;
+}
+
+void gfx_destroy(struct gfx_state *s) {
+    /* Restore terminal */
+    tcsetattr(STDIN_FILENO, TCSANOW, &s->old_tio);
+    printf("\033[?25h");  /* Show cursor */
+    free(s);
+}
+
+void gfx_sleep(int ms) {
+    usleep(ms * 1000);
+}
+#+end_src
+
+*** Minimal Main Loop
+#+begin_src c :tangle exp_032/src/main.c :mkdirp yes
+#include <stdio.h>
+#include "flappy.h"
+#include "gfx.h"
+
+int main(int argc, char **argv) {
+    struct gamestate *g = game_init();
+    struct gfx_state *s = gfx_init(g);
+    
+    /* Main loop - perfect for LLDB breakpoints */
+    while (1) {
+        int input = gfx_getch(s);
+        
+        if (input == 'q' || input == 'Q') {
+            break;
+        }
+        
+        game_tick(g, input);
+        gfx_draw(s, g);
+        
+        /* Fixed frame rate for consistent debugging */
+        gfx_sleep(50);  /* 20 FPS - slow enough to debug */
+    }
+    
+    gfx_destroy(s);
+    game_free(g);
+    
+    return 0;
+}
+#+end_src
+
+*** Graphics Interface (Reused from 2048)
+#+begin_src c :tangle exp_032/src/gfx.h :mkdirp yes
+#ifndef GFX_H
+#define GFX_H
+
+struct gamestate;
+struct gfx_state;
+
+/* Same interface as 2048! */
+struct gfx_state* gfx_init(struct gamestate *g);
+void gfx_draw(struct gfx_state *s, struct gamestate *g);
+int gfx_getch(struct gfx_state *s);
+void gfx_destroy(struct gfx_state *s);
+void gfx_sleep(int ms);
+
+#endif /* GFX_H */
+#+end_src
+
+*** Build System
+#+begin_src makefile :tangle exp_032/Makefile :mkdirp yes
+CC = clang
+CFLAGS = -g -O0 -Wall -Wextra
+LDFLAGS = 
+
+SRC = src/main.c src/engine.c src/gfx_terminal.c
+OBJ = $(SRC:.c=.o)
+TARGET = flappy-debug
+
+all: $(TARGET)
+
+$(TARGET): $(OBJ)
+	$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJ) $(TARGET)
+
+# Debug target with sanitizers
+debug: CFLAGS += -fsanitize=address,undefined
+debug: LDFLAGS += -fsanitize=address,undefined
+debug: clean all
+
+.PHONY: all clean debug
+#+end_src
+
+*** LLDB Debug Commands
+#+begin_src lldb :tangle exp_032/debug_commands.lldb :mkdirp yes
+# Flappy Bird Debug Commands
+
+# Breakpoints at key locations
+breakpoint set -n game_tick
+breakpoint set -n check_collisions
+
+# Custom commands for state inspection
+command alias bird p g->bird_y, g->bird_velocity
+command alias pipes p g->pipes[0], g->pipes[1], g->pipes[2]
+command alias state p *g
+
+# Watch bird position
+watchpoint set variable g->bird_y
+
+# Pretty print game state
+command script add -f flappy_debug.print_state pstate
+
+# Continue helpers
+command alias j expr g->bird_velocity = -8.0f
+command alias die expr g->alive = 0
+command alias live expr g->alive = 1
+command alias teleport expr g->bird_y = 
+#+end_src
+
+*** Python LLDB Helper
+#+begin_src python :tangle exp_032/flappy_debug.py :mkdirp yes
+#!/usr/bin/env python3
+"""LLDB Python helpers for Flappy debugging."""
+
+import lldb
+
+def print_state(debugger, command, result, internal_dict):
+    """Pretty print game state."""
+    target = debugger.GetSelectedTarget()
+    process = target.GetProcess()
+    thread = process.GetSelectedThread()
+    frame = thread.GetSelectedFrame()
+    
+    # Get game state
+    g = frame.FindVariable("g")
+    if not g.IsValid():
+        result.AppendMessage("No gamestate 'g' found")
+        return
+    
+    # Extract values
+    bird_y = g.GetChildMemberWithName('bird_y').GetValue()
+    bird_vel = g.GetChildMemberWithName('bird_velocity').GetValue()
+    score = g.GetChildMemberWithName('score').GetValue()
+    tick = g.GetChildMemberWithName('world_tick').GetValue()
+    alive = g.GetChildMemberWithName('alive').GetValue()
+    
+    result.AppendMessage(f"=== Flappy State at Tick {tick} ===")
+    result.AppendMessage(f"Bird: y={bird_y}, vel={bird_vel}")
+    result.AppendMessage(f"Score: {score}, Alive: {alive}")
+    
+    # Show pipes
+    for i in range(3):
+        pipe = g.GetChildMemberWithName('pipes').GetChildAtIndex(i)
+        if pipe.GetChildMemberWithName('active').GetValueAsUnsigned() > 0:
+            x = pipe.GetChildMemberWithName('x').GetValue()
+            gap = pipe.GetChildMemberWithName('gap_top').GetValue()
+            result.AppendMessage(f"Pipe {i}: x={x}, gap_top={gap}")
+
+def __lldb_init_module(debugger, internal_dict):
+    debugger.HandleCommand('command script add -f flappy_debug.print_state pstate')
+    print("Flappy debug commands loaded")
+#+end_src
+
+*** Automated Testing Script
+#+begin_src bash :tangle exp_032/test_deterministic.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test deterministic behavior
+
+cd exp_032
+make clean all
+
+echo "=== Testing Deterministic Behavior ==="
+
+# Run 1: Record 50 frames with no input
+./flappy-debug << EOF > run1.txt &
+sleep 3
+pkill flappy-debug
+EOF
+
+# Run 2: Should be identical
+./flappy-debug << EOF > run2.txt &
+sleep 3
+pkill flappy-debug
+EOF
+
+# Compare outputs
+if diff run1.txt run2.txt > /dev/null; then
+    echo "✅ Behavior is deterministic!"
+else
+    echo "❌ Runs differ - not deterministic"
+    diff run1.txt run2.txt
+fi
+
+# Test with LLDB
+echo -e "\n=== Testing LLDB Integration ==="
+lldb ./flappy-debug << 'LLDB_EOF'
+breakpoint set -n game_tick
+run
+# Let it run 10 frames
+continue 10
+# Jump!
+expr g->bird_velocity = -8.0f
+continue 10
+# Check state
+p *g
+quit
+LLDB_EOF
+#+end_src
+
+*** Claude AI Controller
+#+begin_src python :tangle exp_032/claude_plays_flappy.py :mkdirp yes
+#!/usr/bin/env python3
+"""Claude plays Flappy Bird via LLDB."""
+
+import subprocess
+import time
+
+def claude_decision(bird_y, next_pipe_x, gap_top):
+    """Simple AI decision - jump if bird below gap center."""
+    gap_center = gap_top + 30  # PIPE_GAP / 2
+    
+    # Only consider nearby pipes
+    if next_pipe_x > 40:
+        return False
+        
+    # Jump if below gap center
+    return bird_y > gap_center
+
+def play_game():
+    """Control Flappy via LLDB."""
+    lldb = subprocess.Popen(
+        ['lldb', './flappy-debug'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    
+    # Setup
+    commands = [
+        'breakpoint set -n game_tick',
+        'run',
+        'command alias getbird p g->bird_y',
+        'command alias jump expr g->bird_velocity = -8.0f'
+    ]
+    
+    for cmd in commands:
+        lldb.stdin.write(cmd + '\n')
+        lldb.stdin.flush()
+        time.sleep(0.1)
+    
+    # Main game loop
+    for i in range(100):  # Play 100 frames
+        # Get bird position
+        lldb.stdin.write('getbird\n')
+        lldb.stdin.flush()
+        
+        # Simple decision
+        if i % 10 == 0:  # Jump every 10 frames
+            lldb.stdin.write('jump\n')
+            lldb.stdin.flush()
+        
+        # Continue
+        lldb.stdin.write('continue\n')
+        lldb.stdin.flush()
+        time.sleep(0.05)
+    
+    lldb.terminate()
+
+if __name__ == '__main__':
+    play_game()
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Total lines*: Under 500 (main.c ~50, engine.c ~150, gfx_terminal.c ~100)
+2. *Deterministic*: Identical runs produce identical output
+3. *Debug-friendly*: Every variable easily inspectable
+4. *Frame control*: Can step through one frame at a time
+5. *State manipulation*: Can teleport bird, modify physics
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** KEY FEATURES FOR DEBUGGING
+
+1. *No randomness*: Pipes follow fixed pattern
+2. *Frame counter*: Every action tied to world_tick
+3. *Freeze mode*: Stop physics but keep rendering
+4. *Step mode*: Advance one frame at a time
+5. *Collision tracking*: Know exact tick of death
+6. *Fixed positions*: Bird always at x=20
+
+** LESSONS FROM 2048
+
+Applied patterns:
+- Single gamestate structure
+- Minimal API (init/tick/free)
+- Same gfx.h interface
+- Fixed timing loop
+- LLDB-first design
+
+** NEXT STEPS
+
+1. Build and test deterministic behavior
+2. Create LLDB visualization commands
+3. Implement Claude AI controller
+4. Compare with 2048 debugging patterns
+5. Use for AWS challenge demo
+
+** RELATED EXPERIMENTS
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: LLDB memory inspection
+- [[file:exp_017_lldb_controller.org][Experiment #017]]: LLDB automation patterns
+- [[file:exp_031_wasm_build_infrastructure.org][Experiment #031]]: WASM build (can apply here too!)

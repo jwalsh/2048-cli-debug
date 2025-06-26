@@ -1,0 +1,367 @@
+#+TITLE: Experiment #033: Moon Buggy Debug Analysis
+#+DATE: [2025-06-25]
+#+STATUS: PLANNED
+
+* EXPERIMENT #033: Moon Buggy Debug Analysis
+:PROPERTIES:
+:ID: exp-033-moon-buggy-debug-analysis
+:HYPOTHESIS: Moon Buggy's modular structure makes it ideal for debugging
+:STATUS: PLANNED
+:END:
+
+** HYPOTHESIS
+Moon Buggy (FreeBSD port) provides:
+1. More complex state than Snake but simpler than full games
+2. Multiple interacting systems (buggy, ground, meteors, laser)
+3. Real physics simulation (gravity, jumping)
+4. Modular file structure ideal for targeted debugging
+
+** RATIONALE
+Moon Buggy sits in the "Goldilocks zone" for debugging:
+- More interesting than Snake (just position tracking)
+- Less complex than RPGs or strategy games
+- Has real physics and timing challenges
+- Multiple game objects to track
+
+** METHOD
+
+*** Analyze Code Structure
+#+begin_src bash :tangle exp_033/scripts/analyze_structure.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Analyze Moon Buggy source structure
+
+MOON_SRC="../moon-buggy-1.0.51"
+
+echo "=== Moon Buggy Source Analysis ==="
+
+# Core files
+echo -e "\n1. Main game files:"
+ls -la $MOON_SRC/{main,game,buggy}.c 2>/dev/null | awk '{print $NF, $5 " bytes"}'
+
+# Game objects
+echo -e "\n2. Game object files:"
+ls -la $MOON_SRC/{ground,meteor,laser,level}.c 2>/dev/null | awk '{print $NF, $5 " bytes"}'
+
+# Support systems
+echo -e "\n3. Support systems:"
+ls -la $MOON_SRC/{keyboard,terminal,highscore,error}.c 2>/dev/null | awk '{print $NF, $5 " bytes"}'
+
+# Count total lines
+echo -e "\n4. Code complexity:"
+echo "Total C files: $(find $MOON_SRC -name "*.c" | wc -l)"
+echo "Total lines: $(find $MOON_SRC -name "*.c" -exec wc -l {} + | tail -1)"
+
+# Look for state structures
+echo -e "\n5. Key data structures:"
+grep -n "struct.*{" $MOON_SRC/*.h | head -10
+#+end_src
+
+*** Extract Game State
+#+begin_src bash :tangle exp_033/scripts/extract_state.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Extract game state structures from Moon Buggy
+
+MOON_SRC="../moon-buggy-1.0.51"
+
+echo "=== Extracting Game State Structures ==="
+
+# Look in main headers
+for header in buggy.h moon-buggy.h; do
+    if [ -f "$MOON_SRC/$header" ]; then
+        echo -e "\n--- $header ---"
+        # Extract struct definitions
+        awk '/^struct/ {p=1} p {print} /^};/ {p=0}' "$MOON_SRC/$header"
+    fi
+done
+
+# Find global state variables
+echo -e "\n=== Global State Variables ==="
+grep -h "^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]\+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*;" $MOON_SRC/*.c | \
+    grep -E "(buggy|game|score|level|meteor)" | head -20
+#+end_src
+
+*** Debug Hook Points
+#+begin_src c :tangle exp_033/debug_hooks.h :mkdirp yes
+/* debug_hooks.h - LLDB integration points for Moon Buggy */
+
+/* Key functions to breakpoint */
+#define DEBUG_BREAKPOINTS \
+    "game_tick",          /* Main game loop */ \
+    "handle_input",       /* Keyboard processing */ \
+    "update_buggy",       /* Buggy physics */ \
+    "check_collisions",   /* Collision detection */ \
+    "spawn_meteor",       /* Object creation */ \
+    "update_score"        /* Score changes */
+
+/* State inspection helpers */
+#define INSPECT_BUGGY \
+    "p buggy_x, buggy_y, buggy_state"
+
+#define INSPECT_WORLD \
+    "p level, scroll_pos, ground_height"
+
+#define INSPECT_OBJECTS \
+    "p meteor_count, laser_active"
+
+/* For LLDB Python scripting */
+typedef struct {
+    int buggy_x;
+    int buggy_y;
+    int buggy_jumping;
+    int buggy_state;  /* alive, crashing, crashed */
+    
+    int level;
+    int score;
+    int lives;
+    
+    int scroll_position;
+    int game_speed;
+    
+    /* Object counts */
+    int meteor_count;
+    int laser_charges;
+    
+    /* Timing */
+    int frame_count;
+    int last_input;
+} debug_gamestate;
+#+end_src
+
+*** Minimal Debug Wrapper
+#+begin_src c :tangle exp_033/moon_debug_wrapper.c :mkdirp yes
+/* moon_debug_wrapper.c - Minimal wrapper for debugging Moon Buggy */
+#include <stdio.h>
+#include <dlfcn.h>
+
+/* Function pointers to game functions */
+static void (*game_init)(void);
+static void (*game_tick)(void);
+static int (*get_input)(void);
+
+/* Our debug state mirror */
+typedef struct {
+    int frame;
+    int last_x;
+    int last_y;
+    int jump_count;
+    int crash_count;
+} debug_info;
+
+static debug_info dbg = {0};
+
+/* Wrap game_tick to add debug info */
+void debug_game_tick(void) {
+    dbg.frame++;
+    
+    /* Call original */
+    game_tick();
+    
+    /* Could extract state here */
+    if (dbg.frame % 10 == 0) {
+        printf("[DBG] Frame %d\n", dbg.frame);
+    }
+}
+
+/* Initialize with hooks */
+void debug_init(void) {
+    /* Load original game */
+    void *handle = dlopen("./moon-buggy", RTLD_LAZY);
+    if (!handle) {
+        fprintf(stderr, "Cannot load moon-buggy\n");
+        return;
+    }
+    
+    /* Get function pointers */
+    game_init = dlsym(handle, "game_init");
+    game_tick = dlsym(handle, "game_tick");
+    
+    /* Initialize game */
+    game_init();
+    
+    printf("[DBG] Moon Buggy Debug Wrapper Initialized\n");
+}
+#+end_src
+
+*** Comparison with Snake
+#+begin_src org :tangle exp_033/snake_vs_moonbuggy.org :mkdirp yes
+* Snake vs Moon Buggy for LLM/Debug Work
+
+** Snake Characteristics
+- *State*: Just snake position array + food location
+- *Physics*: None (discrete grid movement)
+- *Complexity*: ~500 lines total
+- *Debug targets*: Position, collision, growth
+
+** Moon Buggy Characteristics  
+- *State*: Buggy physics, ground terrain, multiple meteors, laser
+- *Physics*: Gravity, jumping, momentum
+- *Complexity*: ~3000 lines (still manageable)
+- *Debug targets*: Physics, collision, spawning, scrolling
+
+** For LLM/Debug Focus:
+
+*** Moon Buggy WINS because:
+1. *Richer State Space*
+   - Multiple interacting systems
+   - Real physics to debug
+   - Time-based challenges
+
+2. *Better Breakpoint Opportunities*
+   - Collision detection
+   - Physics updates  
+   - Object spawning
+   - Level transitions
+
+3. *More Interesting for Claude*
+   - Can debug physics calculations
+   - Multiple strategies (jump vs shoot)
+   - Predictable but complex patterns
+
+*** Snake is too simple:
+- Just array manipulation
+- No physics
+- Limited decisions (4 directions)
+- Boring for advanced debugging
+
+** Recommendation: Moon Buggy
+It's the sweet spot between "too simple" (Snake) and "too complex" (RPG).
+#+end_src
+
+*** LLDB Integration Script
+#+begin_src python :tangle exp_033/moon_buggy_lldb.py :mkdirp yes
+#!/usr/bin/env python3
+"""LLDB commands for Moon Buggy debugging."""
+
+import lldb
+
+def print_game_state(debugger, command, result, internal_dict):
+    """Print current game state."""
+    target = debugger.GetSelectedTarget()
+    process = target.GetProcess()
+    thread = process.GetSelectedThread()
+    frame = thread.GetSelectedFrame()
+    
+    # Common Moon Buggy variables to inspect
+    vars_to_check = [
+        'buggy_x', 'buggy_y', 'buggy_state',
+        'score', 'level', 'lives',
+        'meteor_count', 'scroll_pos'
+    ]
+    
+    result.AppendMessage("=== Moon Buggy State ===")
+    
+    for var_name in vars_to_check:
+        var = frame.FindVariable(var_name)
+        if var.IsValid():
+            result.AppendMessage(f"{var_name}: {var.GetValue()}")
+        else:
+            # Try global scope
+            var = target.FindFirstGlobalVariable(var_name)
+            if var.IsValid():
+                result.AppendMessage(f"{var_name}: {var.GetValue()}")
+
+def jump_buggy(debugger, command, result, internal_dict):
+    """Force buggy to jump."""
+    debugger.HandleCommand('expr buggy_jumping = 1')
+    debugger.HandleCommand('expr buggy_y_velocity = -10')
+    result.AppendMessage("Buggy jumping!")
+
+def spawn_debug_meteor(debugger, command, result, internal_dict):
+    """Spawn a meteor at specific location."""
+    if command:
+        x = int(command)
+        debugger.HandleCommand(f'expr spawn_meteor_at({x})')
+    result.AppendMessage(f"Spawned meteor at x={command}")
+
+def __lldb_init_module(debugger, internal_dict):
+    """Register Moon Buggy debug commands."""
+    debugger.HandleCommand('command script add -f moon_buggy_lldb.print_game_state mbstate')
+    debugger.HandleCommand('command script add -f moon_buggy_lldb.jump_buggy mbjump')
+    debugger.HandleCommand('command script add -f moon_buggy_lldb.spawn_debug_meteor mbmeteor')
+    print("Moon Buggy debug commands loaded: mbstate, mbjump, mbmeteor")
+#+end_src
+
+*** Build Integration Test
+#+begin_src bash :tangle exp_033/test_moon_buggy_debug.sh :shebang #!/bin/bash :mkdirp yes
+#!/bin/bash
+# Test Moon Buggy debug integration
+
+echo "=== Testing Moon Buggy Debug Setup ==="
+
+# 1. Check if binary has debug symbols
+echo "1. Checking debug symbols..."
+if file ../moon-buggy-1.0.51/moon-buggy | grep -q "not stripped"; then
+    echo "✅ Debug symbols present"
+else
+    echo "❌ No debug symbols - rebuild with -g"
+fi
+
+# 2. Test LLDB attachment
+echo -e "\n2. Testing LLDB attachment..."
+cat > test_lldb.cmd << EOF
+target create ../moon-buggy-1.0.51/moon-buggy
+b main
+run
+bt
+quit
+EOF
+
+lldb -s test_lldb.cmd -b > lldb_test.log 2>&1
+if grep -q "frame #0.*main" lldb_test.log; then
+    echo "✅ LLDB can attach and break"
+else
+    echo "❌ LLDB attachment failed"
+fi
+
+# 3. Look for key functions
+echo -e "\n3. Searching for debug targets..."
+nm ../moon-buggy-1.0.51/moon-buggy | grep -E "(game|buggy|meteor|collision)" | head -10
+
+# 4. Complexity assessment
+echo -e "\n4. Complexity metrics:"
+echo "Binary size: $(stat -f%z ../moon-buggy-1.0.51/moon-buggy 2>/dev/null || stat -c%s ../moon-buggy-1.0.51/moon-buggy) bytes"
+echo "Symbol count: $(nm ../moon-buggy-1.0.51/moon-buggy | wc -l)"
+
+rm -f test_lldb.cmd lldb_test.log
+#+end_src
+
+** EXPECTED RESULTS
+
+1. *Code Structure*: Well-organized with separate files for each system
+2. *State Complexity*: ~50-100 bytes of game state (vs 2048's ~100 bytes)
+3. *Debug Points*: 10-15 key functions for breakpoints
+4. *Physics Model*: Simple but real (gravity, velocity)
+
+** OBSERVATIONS
+[To be completed during experiment execution]
+
+** COMPARISON: Why Moon Buggy > Snake
+
+| Aspect | Snake | Moon Buggy | Winner |
+|--------+-------+------------+--------|
+| State Size | ~20 vars | ~50 vars | Moon Buggy |
+| Physics | None | Gravity/Jump | Moon Buggy |
+| Objects | 2 (snake, food) | 4+ (buggy, ground, meteors, laser) | Moon Buggy |
+| Decisions | 4 directions | Jump, shoot, wait | Moon Buggy |
+| Timing | Turn-based | Real-time | Moon Buggy |
+| Debug Interest | Low | High | Moon Buggy |
+
+** INTEGRATION CHALLENGES
+
+1. *Build System*: autoconf/automake (more complex than raw Make)
+2. *Terminal Code*: Heavy curses usage
+3. *Global State*: May use globals instead of structs
+4. *Timing*: Real-time with interrupts
+
+** NEXT STEPS
+
+1. Build Moon Buggy with debug flags
+2. Map out actual data structures
+3. Create debug command set
+4. Build Claude AI player
+5. Compare with 2048/Flappy approaches
+
+** RELATED EXPERIMENTS
+- [[file:exp_032_minimal_flappy_debug.org][Experiment #032]]: Minimal Flappy Bird
+- [[file:exp_003_lldb_memory.org][Experiment #003]]: LLDB techniques
+- [[file:exp_017_lldb_controller.org][Experiment #017]]: LLDB automation
