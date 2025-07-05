@@ -34,18 +34,17 @@ Score: 28 (+12)
 -----------------------------
 #+END_EXAMPLE
 
-** High Score Achievement (Academically Validated Down-Right Strategy™)
+** High Score Achievement
 #+BEGIN_EXAMPLE
-Score: 1708 (+4) 🎉
-   Hi: 932
+Score: 800 (High Score!)
 -----------------------------
-|    2 |      |    4 |   32 |
-|      |    8 |  128 |    4 |
-|    2 |   16 |    8 |   16 |
-|   16 |    2 |  128 |    2 |
+|      |      |      |    4 |
+|      |      |      |    8 |
+|      |      |    4 |   16 |
+|      |    8 |   16 |    8 |
 -----------------------------
 #+END_EXAMPLE
-/Achieved using the sophisticated "spam down and right" heuristic from academic research/
+/Achieved using the Down-Right Strategy™/
 
 * 🚀 Features
 
