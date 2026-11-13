@@ -9,3 +9,6 @@ TAGS
 experiments/README.txt
 # Ignore generated README.md (created from README.org)
 README.md
+
+# Claude Code per-user settings: approved commands can carry secrets; never commit.
+.claude/settings.local.json
